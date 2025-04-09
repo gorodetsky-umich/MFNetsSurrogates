@@ -123,7 +123,7 @@ class EqualModelAverageEdge(nn.Module):
     def __init__(self, dim_in, dim_out, num_parents, model):
         """Initialize the EqualModeAvergeEdge
 
-        f_{j} = \frac{1}{num_parents} \sum  f_{i} + delta_j(x)
+        f_{j} = \frac{1}{num_parents} \\sum  f_{i} + delta_j(x)
 
         Parameters
         ----------
@@ -622,8 +622,8 @@ class MFNetTorch(nn.Module):
         anc_and_target = anc.union(set([target_node]))
         relevant_root_nodes = anc.intersection(self.roots)
 
-        print("eval target node scale shift = ", xinput.shape)
-        print("target = ", target_node)
+        # print("eval target node scale shift = ", xinput.shape)
+        # print("target = ", target_node)
         # Evaluate the target nodes and all ancestral nodes and put the root
         # nodes in a queue
         queue = SimpleQueue()
@@ -646,25 +646,25 @@ class MFNetTorch(nn.Module):
                 if child in anc_and_target:
                     pval = self.graph.edges[node, child]["func"](xinput)
 
-                    print("\n")
-                    print("node = ", node)
-                    print("child = ", child)
-                    print("pval shape", pval.shape)
-                    print("xinput shape", xinput.shape)
-                    print(self.graph.edges[node, child]["func"])
-                    print(self.graph.edges[node, child]["func"](xinput).shape)
-                    print(self.graph.edges[node, child]['out_rows'],  self.graph.edges[node, child]['out_cols'])
+                    # print("\n")
+                    # print("node = ", node)
+                    # print("child = ", child)
+                    # print("pval shape", pval.shape)
+                    # print("xinput shape", xinput.shape)
+                    # print(self.graph.edges[node, child]["func"])
+                    # print(self.graph.edges[node, child]["func"](xinput).shape)
+                    # print(self.graph.edges[node, child]['out_rows'],  self.graph.edges[node, child]['out_cols'])
                     if pval.shape[1] != self.graph.edges[node, child]['out_rows']*  self.graph.edges[node, child]['out_cols']:
-                        print("shape doesnt make sense")
-                        print("xinput.shape", xinput.shape)
+                        # print("shape doesnt make sense")
+                        # print("xinput.shape", xinput.shape)
                         current_model = self.graph.edges[node, child]["func"]
-                        print("current_model = ", current_model)
+                        # print("current_model = ", current_model)
                         test_in = torch.rand(4,1)
                         test_out = current_model(test_in)
-                        print(test_out.shape)
-                        for name, value in list(current_model.named_parameters(recurse=False)):
-                            print("lets go")
-                            print(name, value.size())
+                        # print(test_out.shape)
+                        # for name, value in list(current_model.named_parameters(recurse=False)):
+                        #     print("lets go")
+                        #     print(name, value.size())
                             
                         exit(1)
                     
@@ -718,7 +718,7 @@ class MFNetTorch(nn.Module):
         -------
         list of evaluations for each of the target nodes
         """
-        print("in forward torch x = ", [xx.shape for xx in xinput])
+        # print("in forward torch x = ", [xx.shape for xx in xinput])
         vals = [
             self.eval_target_node(x, t) for x, t in zip(xinput, target_nodes)
         ]
