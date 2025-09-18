@@ -5,7 +5,8 @@ import unittest
 # import networkx as nx
 
 # from mfnets_surrogates.net_torch import *
-from test_utils import *
+
+from .test_utils import *
 from mfnets_surrogates.net_pyro import *
 
 from pyro.infer.autoguide import (
@@ -20,7 +21,7 @@ from pyro.infer.autoguide import (
 
 class TestMfnetPyro(unittest.TestCase):
 
-    @unittest.skip('testing other')
+    # @unittest.skip('testing other')
     def test_vi_mean_pred(self):
         torch.manual_seed(2)
 
@@ -101,7 +102,7 @@ class TestMfnetPyro(unittest.TestCase):
             # plt.show()
             assert err<1e-3, f"testing error is {err}"
 
-    @unittest.skip('testing other')
+    # @unittest.skip('testing other')
     def test_vi_multi_out(self):
         torch.manual_seed(2)
 
@@ -162,7 +163,7 @@ class TestMfnetPyro(unittest.TestCase):
             print("err = ", err)
             assert err<1e-3, f"Testing error = {err}"
 
-    @unittest.skip('testing other')
+    # @unittest.skip('testing other')
     def test_vi_multi_out_gen(self):
         torch.manual_seed(2)
 
@@ -272,7 +273,7 @@ class TestMfnetPyro(unittest.TestCase):
             assert err<1e-3, f"Testing error = {err}"
 
 
-    @unittest.skip('testing other')
+    # @unittest.skip('testing other')
     def test_vi_multi_out_gen_nn_model_average(self):
         torch.manual_seed(2)
 

@@ -4,7 +4,7 @@ import unittest
 # import networkx as nx
 
 # from mfnets_surrogates.net_torch import *
-from test_utils import *
+from .test_utils import *
 
 class TestMfnet(unittest.TestCase):
 
@@ -189,7 +189,7 @@ class TestMfnet(unittest.TestCase):
         # print("yshapes = ", [yy.size() for yy in y])
         # print("y = ", y)
         # exit(1)
-        std = 1.#1e-4
+        std = 1e-4
 
         # learning
         graph_learn, roots_learn, _ = make_graph_4gen_nn()        
@@ -224,7 +224,7 @@ class TestMfnet(unittest.TestCase):
             print("err = ", err)
             assert err<1e-3
 
-    @unittest.skip('testing other')
+    # @unittest.skip('testing other')
     def test_least_squares_opt_multi_out_gen_nn_model_average(self):
         torch.manual_seed(2)
 

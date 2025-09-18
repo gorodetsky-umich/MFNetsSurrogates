@@ -1,0 +1,41 @@
+---
+num_models: 2
+save_dir: results/ex8
+model_info: 
+  - 
+      name: 1 
+      desc_name: 
+      train_input: sample_data/multi_output/data1_in.txt 
+      train_output: sample_data/multi_output/data1_out.txt 
+      output_dir: resultsM1 
+      test_output:
+        - sample_data/multi_output/data1_in.txt
+        - sample_data/multi_output/eval.txt 
+  - 
+      name: 2
+      train_input: sample_data/multi_output/data2_in.txt
+      train_output: sample_data/multi_output/data2_out.txt
+      output_dir: resultsM2 
+      test_output:
+        - sample_data/multi_output/data2_in.txt
+        - sample_data/multi_output/eval.txt 
+      
+inference_type: regression 
+algorithm:
+  noise_std: 1e-5 
+  num_optimization_steps: 1000
+graph:
+  structure: sample_data/multi_output/graph.edge_list
+  connection_type: general 
+  connection_models:
+    -
+      name: 1
+      node_type: polynomial
+      poly_order: 5
+      poly_name: 'hermite'
+    -
+      name: 2
+      node_type: poly-linear-scale-shift
+      poly_order: 7
+      poly_name: 'hermite'
+...

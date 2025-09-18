@@ -1,0 +1,200 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "MFNetsSurrogates"
+description = "Multifidelity surrogate networks"
+# readme = "README.org"
+requires-python = ">= 3.11"
+license = {text = "MIT License"}
+version = "0.0.1"
+keywords = ["Networks",
+    "Graph Theory",
+    "Mathematics",
+    "Uncertainty Quantification",
+    "Multifidelity Modeling",
+]
+authors = [
+  { name = "Alex Gorodetsky", email = "alex@alexgorodetsky.com" },
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+  "numpy ~=2.1.0",
+  "pydantic",
+  "scikit-learn",
+  "scipy",
+  "pandas",
+  "networkx",
+  "matplotlib", # for plotting
+  "torch",
+  "pyro-ppl",
+  "pyyaml ~= 6.0.2",
+  "ruff",
+  "pylint",
+  "flake8",
+  "flake8-pyproject"
+]
+
+[tool.setuptools]
+packages = ["mfnets_surrogates"]
+
+
+[project.urls]
+Documentation = "https://www.alexgorodetsky.com/mfnets_surrogate_code/net.html"
+Issues = "https://github.com/goroda/MFNetsSurrogates/issues"
+Source = "https://github.com/goroda/MFNetsSurrogates"
+
+
+[tool.pylint.main]
+analyse-fallback-blocks = false
+clear-cache-post-run = false
+confidence = ["HIGH", "CONTROL_FLOW", "INFERENCE", "INFERENCE_FAILURE", "UNDEFINED"]
+disable = ["bad-inline-option", "deprecated-pragma", "file-ignored", "locally-disabled", "raw-checker-failed", "suppressed-message", "use-implicit-booleaness-not-comparison-to-string", "use-implicit-booleaness-not-comparison-to-zero", "use-symbolic-message-instead", "useless-suppression", "too-few-public-methods", "too-many-locals", "too-many-lines"]
+enable = []
+evaluation = "max(0, 0 if fatal else 10.0 - ((float(5 * error + warning + refactor + convention) / statement) * 10))"
+exit-zero = false
+extension-pkg-allow-list = []
+extension-pkg-whitelist = []
+fail-on = []
+fail-under = 10
+ignore = ["CVS", "*flycheck*"]
+ignore-paths = []
+ignore-patterns = ["^\\.#"]
+ignored-modules = []
+limit-inference-results = 100
+load-plugins = []
+msg-template = ""
+# output-format =
+persistent = true
+py-version = 3.11
+recursive = false
+reports = false
+score = true
+source-roots = []
+
+[tool.flake8]
+extend-ignore = "E203"
+exclude = [
+        ".git",
+        "__pycache__",
+        "docs/source/conf.py",
+        "old",
+        "build",
+        "dist",
+        "mfnets_surrogates/__init__.py",
+		"*flycheck*"
+        ]
+
+[tool.mypy]
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+# untyped_calls_exclude = ['opt_einsum', 'networkx']
+files = ['mfnets_surrogates/*.py']
+plugins = 'numpy.typing.mypy_plugin'
+
+[[tool.mypy.overrides]]
+module = [
+       # 'torch',
+       # 'torchvision',
+       # 'torch.utils.tensorboard',
+       # 'opt_einsum',
+       'networkx',
+       'h5py',
+       'matplotlib',
+       'matplotlib.pyplot',
+       'pydantic'
+       ]
+ignore_missing_imports = true
+
+
+
+[tool.ruff]
+include = ["pyproject.toml", "mfnets_surrogates/**/*.py", "mfnets_surrogates/**/*.py"]
+# Exclude a variety of commonly ignored directories.
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".ipynb_checkpoints",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pyenv",
+    ".pytest_cache",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    ".vscode",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "site-packages",
+    "venv",
+]
+
+line-length=79
+# Same as Black.
+# line-length = 88
+indent-width = 4
+
+# Assume Python 3.12
+target-version = "py312"
+
+[tool.ruff.lint]
+# Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
+# Unlike Flake8, Ruff doesn't enable pycodestyle warnings (`W`) or
+# McCabe complexity (`C901`) by default.
+select = ["E4", "E7", "E9", "F"]
+ignore = []
+
+# Allow fix for all enabled rules (when `--fix`) is provided.
+fixable = ["ALL"]
+unfixable = []
+
+# Allow unused variables when underscore-prefixed.
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[tool.ruff.format]
+# Like Black, use double quotes for strings.
+quote-style = "double"
+
+# Like Black, indent with spaces, rather than tabs.
+indent-style = "space"
+
+# Like Black, respect magic trailing commas.
+skip-magic-trailing-comma = false
+
+# Like Black, automatically detect the appropriate line ending.
+line-ending = "auto"
+
+# Enable auto-formatting of code examples in docstrings. Markdown,
+# reStructuredText code/literal blocks and doctests are all supported.
+#
+# This is currently disabled by default, but it is planned for this
+# to be opt-out in the future.
+docstring-code-format = false
+
+# Set the line length limit used when formatting code snippets in
+# docstrings.
+#
+# This only has an effect when the `docstring-code-format` setting is
+# enabled.
+docstring-code-line-length = "dynamic"
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["E402", "F403", "F401"]
+"**/{tests,docs,tools}/*" = ["E402"]

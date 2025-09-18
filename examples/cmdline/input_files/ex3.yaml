@@ -1,0 +1,32 @@
+---
+num_models: 2
+save_dir: results/ex3
+model_info: # names must match the nodes in the graph.edge_list file
+  - 
+      name: 1 # must match edge_list file
+      desc_name: # use this for descriptive name
+      train_input: sample_data/multi_output/data1_in.txt # headers needed
+      train_output: sample_data/multi_output/data1_out.txt # headers needed
+      output_dir: resultsM1 # relative filename
+      test_output:
+        - sample_data/multi_output/data1_in.txt
+        - sample_data/multi_output/eval.txt # optional
+  - 
+      name: 2
+      train_input: sample_data/multi_output/data2_in.txt
+      train_output: sample_data/multi_output/data2_out.txt
+      output_dir: resultsM2 
+      test_output:
+        - sample_data/multi_output/data2_in.txt
+        - sample_data/multi_output/eval.txt #optional
+      
+inference_type: regression 
+algorithm:
+  noise_std: 1e0 
+  num_optimization_steps: 1000
+graph:
+  structure: sample_data/multi_output/graph.edge_list
+  node_model: linear
+  edge_model: linear
+  connection_type: scale-shift 
+...
