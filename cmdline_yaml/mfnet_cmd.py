@@ -333,8 +333,13 @@ if __name__ == "__main__":
         logging.info(f"Model: {model}")
         
         ## Train
-        loss_fns = net.construct_loss_funcs(model)        
-        obj_func = model.train(data_loaders, target_nodes, loss_fns)
+        loss_fns = net.construct_loss_funcs(model)
+        if 'num_optimization_steps' in input_spec['algorithm']:
+            max_iter = input_spec['algorithm']['num_optimization_steps']
+        else:
+            max_iter = 100
+        obj_func = model.train(data_loaders, target_nodes, loss_fns,
+                               max_iter=max_iter)
         logging.info(f"Model Loss: {obj_func}")
 
 
