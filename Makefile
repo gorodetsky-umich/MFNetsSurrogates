@@ -52,9 +52,13 @@ run-example: ## Run the basic training example script
 	@echo "--> Running basic training example..."
 	@python examples/basic_training.py
 
-run-mlp-graph: ## Run the basic training example script
+run-mlp-graph: ## Run an example showing MLP nodes with multiple graphs
 	@echo "--> Running MLP multiple graph example..."
 	@python examples/mlp_graph.py
+
+run-pce-graph: ## Run an example showing PCE nodes with multiple graphs on MLP truth
+	@echo "--> Running PCE graph example..."
+	@python examples/pce_graphs_with_mlp_truth.py
 
 
 # ==============================================================================
