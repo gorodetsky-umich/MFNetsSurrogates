@@ -11,14 +11,18 @@ optimizable with JAX-based tools like `jaxopt`.
 
 from collections.abc import Callable
 from functools import partial
+from itertools import combinations_with_replacement
 from typing import Any, NamedTuple
 
 import jax
+import jax.lax as lax
 import jax.nn as jnn
 import jax.numpy as jnp
 import networkx as nx
+import numpy as np
 from jax import tree_util
 from jax.tree_util import register_pytree_node_class
+from scipy.special import comb
 
 
 @register_pytree_node_class
@@ -372,6 +376,168 @@ class MLPEnhancementModel(Model):
         return self.mlp.run(combined_input)
 
 
+# --- Polynomial Chaos Expansion (PCE) Models ---
+
+
+def _hermite_poly_1d(x: float, degree: int) -> jnp.ndarray:
+    """Evaluate 1D normalized Hermite polynomials at a point x."""
+    H = jnp.zeros(degree + 1).at[0].set(1.0)
+    # Handle degree 0 case
+    if degree > 0:
+        H = H.at[1].set(x)
+
+    def body_fun(i, H_current):
+        val = x * H_current[i - 1] - (i - 1) * H_current[i - 2]
+        return H_current.at[i].set(val)
+
+    H = lax.fori_loop(2, degree + 1, body_fun, H)
+    # Cast integer array to float before calling lgamma
+    factorial_arg = (jnp.arange(degree + 1) + 1).astype(jnp.float32)
+    norm = jnp.sqrt(jax.lax.exp(jax.lax.lgamma(factorial_arg)))
+    return H / norm
+
+
+def _legendre_poly_1d(x: float, degree: int) -> jnp.ndarray:
+    """Evaluate 1D Legendre polynomials at a point x."""
+    P = jnp.zeros(degree + 1).at[0].set(1.0)
+    if degree > 0:
+        P = P.at[1].set(x)
+
+    def body_fun(i, P_current):
+        val = ((2 * i - 1) * x * P_current[i - 1] - (i - 1) * P_current[i - 2]) / i
+        return P_current.at[i].set(val)
+
+    return lax.fori_loop(2, degree + 1, body_fun, P)
+
+
+def _compute_multi_indices(ndim: int, degree: int) -> jnp.ndarray:
+    """Compute total-order multi-indices for PCE."""
+    if degree == 0:
+        return jnp.zeros((1, ndim), dtype=jnp.int32)
+
+    alpha = np.zeros((int(comb(ndim + degree, degree)), ndim), dtype=np.int32)
+    count = 0
+    for k in range(degree + 1):
+        for js in combinations_with_replacement(range(ndim), k):
+            for i in range(ndim):
+                alpha[count, i] = js.count(i)
+            count += 1
+    return jnp.array(alpha)
+
+
+def build_poly_basis(
+    x: jnp.ndarray, multi_indices: jnp.ndarray, poly_type: str, degree: int
+) -> jnp.ndarray:
+    """
+    Construct the PCE basis matrix for a batch of inputs.
+
+    Args:
+        x: Input data of shape (n_samples, n_features).
+        multi_indices: The multi-index set defining the basis terms.
+        poly_type: "hermite" or "legendre".
+        degree: The maximum polynomial order.
+
+    Returns
+    -------
+        The PCE basis matrix of shape (n_samples, n_basis_terms).
+    """
+    n_samples, n_dim = x.shape
+
+    if poly_type == "hermite":
+        vmap_poly_eval = jax.vmap(jax.vmap(lambda val: _hermite_poly_1d(val, degree)))
+    elif poly_type == "legendre":
+        vmap_poly_eval = jax.vmap(jax.vmap(lambda val: _legendre_poly_1d(val, degree)))
+    else:
+        raise ValueError("poly_type must be 'hermite' or 'legendre'")
+
+    # p_vals shape: (n_samples, n_dim, degree + 1)
+    p_vals = vmap_poly_eval(x)
+
+    # Gather the appropriate 1D polynomial values for each basis term
+    # multi_indices shape: (n_basis_terms, n_dim) -> (b, d)
+    # We want to select from p_vals (s, d, o) using indices of shape (b, d)
+    # to produce an intermediate tensor of shape (s, b, d)
+    # which we can then prod over the d axis.
+    gathered = p_vals[:, jnp.arange(n_dim)[None, :], multi_indices]
+
+    # Compute the tensor product by multiplying across the dimension axis
+    # shape: (n_samples, n_basis_terms)
+    return jnp.prod(gathered, axis=2)
+
+
+@register_pytree_node_class
+class PCEModel(Model):
+    """A Polynomial Chaos Expansion model."""
+
+    def __init__(
+        self,
+        params: LinearParams,
+        poly_type: str,
+        degree: int,
+        multi_indices: jnp.ndarray,
+    ):
+        """
+        Initialize the PCE model.
+
+        Args:
+            params: Linear coefficients for the polynomial basis.
+            poly_type: "hermite" or "legendre".
+            degree: Maximum polynomial order.
+            multi_indices: Precomputed multi-index set.
+        """
+        self.params = params
+        self.poly_type = poly_type
+        self.degree = degree
+        self.multi_indices = multi_indices
+
+    def tree_flatten(self):
+        """Flatten the model into dynamic parameters and static data."""
+        children = (self.params,)
+        aux_data = (self.poly_type, self.degree, self.multi_indices)
+        return children, aux_data
+
+    @classmethod
+    def tree_unflatten(cls, aux_data, children):
+        """Unflatten the model from its parameters and static data."""
+        poly_type, degree, multi_indices = aux_data
+        params = children[0]
+        return cls(params, poly_type, degree, multi_indices)
+
+    def run(self, xin: jnp.ndarray) -> jnp.ndarray:
+        """Evaluate the PCE model on a batch of inputs."""
+        basis_matrix = build_poly_basis(
+            xin, self.multi_indices, self.poly_type, self.degree
+        )
+        return jnp.dot(basis_matrix, self.params.weight.T) + self.params.bias
+
+
+@register_pytree_node_class
+class PCEnhancementModel(Model):
+    """An enhancement model using a PCE for the node and a linear model for the edge."""
+
+    def __init__(self, edge_model: LinearModel, node_model: PCEModel):
+        self.edge_model = edge_model
+        self.node_model = node_model
+
+    def tree_flatten(self):
+        """Flatten the model's parameters into a list of arrays (leaves)."""
+        return (self.edge_model, self.node_model), {}
+
+    @classmethod
+    def tree_unflatten(cls, aux_data, children):
+        """Unflatten parameter arrays back into a model instance."""
+        return cls(*children)
+
+    def run(self, xin: jnp.ndarray, parent_val: jnp.ndarray) -> jnp.ndarray:
+        """Evaluate the model on a batch of inputs and parent values."""
+        # Note: The edge model in the original torch code had a different shape.
+        # This implementation uses a simpler batched linear model for the edge.
+        edge_input = jnp.concatenate([xin, parent_val], axis=-1)
+        edge_val = self.edge_model.run(edge_input)
+        node_val = self.node_model.run(xin)
+        return edge_val + node_val
+
+
 # --- Loss Functions ---
 
 
@@ -470,6 +636,35 @@ def init_mlp_enhancement_model(
     mlp_params = init_mlp_params(key, layer_sizes)
     mlp_model = MLPModel(mlp_params, activation)
     return MLPEnhancementModel(mlp_model)
+
+
+def init_pce_model(
+    key: jax.Array, dim_in: int, dim_out: int, degree: int, poly_type: str = "hermite"
+) -> PCEModel:
+    """Initialize a PCEModel."""
+    multi_indices = _compute_multi_indices(dim_in, degree)
+    num_basis_terms = multi_indices.shape[0]
+    pce_coeffs = init_linear_params(key, num_basis_terms, dim_out)
+    return PCEModel(pce_coeffs, poly_type, degree, multi_indices)
+
+
+def init_pc_enhancement_model(
+    key: jax.Array,
+    d_in: int,
+    d_parent: int,
+    d_out: int,
+    degree: int,
+    poly_type: str = "hermite",
+) -> PCEnhancementModel:
+    """Initialize a PCEnhancementModel."""
+    edge_key, node_key = jax.random.split(key)
+    edge_params = init_linear_params(edge_key, d_in + d_parent, d_out)
+    edge_model = LinearModel(edge_params)
+    node_model = init_pce_model(node_key, d_in, d_out, degree, poly_type)
+    return PCEnhancementModel(edge_model, node_model)
+
+
+# --- Graph Helpers ---
 
 
 def make_graph_2gen(mod1: Model, mod2: Model) -> nx.DiGraph:

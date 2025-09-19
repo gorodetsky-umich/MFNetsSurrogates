@@ -9,7 +9,7 @@ surrogate models using computational graphs and JAX.
 # accessible directly from the top-level package. This creates a clean
 # and stable user-facing API.
 from .net_jax import (
-    # Specific model implementations
+    # Basic models
     LinearModel,
     LinearModel2D,
     LinearParams,
@@ -17,16 +17,24 @@ from .net_jax import (
     # Core graph class
     MFNetJax,
     MLPEnhancementModel,
+    # MLP models
     MLPModel,
     MLPParams,
-    # Base model class and parameter structures
+    # Base classes and parameter structures
     Model,
+    # PCE models
+    PCEModel,
+    PCEnhancementModel,
+    build_poly_basis,
     init_linear2d_params,
-    # Helper functions for initialization and graph creation
+    # Initializer functions
     init_linear_params,
     init_linear_scale_shift_model,
     init_mlp_enhancement_model,
     init_mlp_params,
+    init_pc_enhancement_model,
+    init_pce_model,
+    # Graph helpers
     make_graph_2gen,
     # Loss functions
     mse_loss_graph,
@@ -43,12 +51,20 @@ __all__ = [
     "LinearModel",
     "LinearModel2D",
     "LinearScaleShiftModel",
+    "MLPParams",
     "MLPModel",
+    "MLPEnhancementModel",
+    "PCEModel",
+    "PCEnhancementModel",
+    "build_poly_basis",
     "mse_loss_graph",
     "resid_loss_graph",
     "init_linear_params",
     "init_linear2d_params",
     "init_linear_scale_shift_model",
     "init_mlp_params",
+    "init_mlp_enhancement_model",
+    "init_pce_model",
+    "init_pc_enhancement_model",
     "make_graph_2gen",
 ]

@@ -20,11 +20,16 @@ from mfnets_surrogates import (
     LinearModel,
     LinearParams,
     MFNetJax,
+    MLPEnhancementModel,
     MLPModel,
     Model,
+    build_poly_basis,
     init_linear_params,
     init_linear_scale_shift_model,
+    init_mlp_enhancement_model,
     init_mlp_params,
+    init_pc_enhancement_model,
+    init_pce_model,
     make_graph_2gen,
     mse_loss_graph,
 )
@@ -225,3 +230,119 @@ def test_mlp_model_output_shape(key):
     y_pred = model.run(x_test)
 
     assert y_pred.shape == (100, 5)
+
+
+def test_mlp_enhancement_model_output_shape(key):
+    """Unit Test: Verify the MLPEnhancementModel has the correct output shape."""
+    d_in, d_parent, d_out = 5, 3, 7
+    batch_size = 100
+
+    # The input layer of the internal MLP must match the combined input dimension
+    layer_sizes = [d_in + d_parent, 32, d_out]
+    model = init_mlp_enhancement_model(key, layer_sizes)
+
+    # Create dummy inputs
+    x_test = jax.random.normal(key, (batch_size, d_in))
+    parent_val = jax.random.normal(key, (batch_size, d_parent))
+
+    y_pred = model.run(x_test, parent_val)
+
+    assert y_pred.shape == (batch_size, d_out)
+
+
+def test_mlp_enhancement_pytree_roundtrip(key):
+    """Unit Test: Ensure MLPEnhancementModel can be flattened and unflattened."""
+    layer_sizes = [5, 16, 2]
+    original_model = init_mlp_enhancement_model(key, layer_sizes)
+
+    leaves, treedef = tree_util.tree_flatten(original_model)
+    rebuilt_model = treedef.unflatten(leaves)
+
+    x_test = jax.random.normal(key, (1, 3))
+    parent_val = jax.random.normal(key, (1, 2))
+
+    original_output = original_model.run(x_test, parent_val)
+    rebuilt_output = rebuilt_model.run(x_test, parent_val)
+
+    assert jnp.allclose(original_output, rebuilt_output)
+
+
+def test_mlp_enhancement_concatenation_logic(key):
+    """Unit Test: Verify the MLPEnhancementModel correctly combines inputs."""
+    d_in, d_parent, d_out = 2, 3, 1
+
+    # Create a simple, deterministic linear layer to act as the internal MLP
+    # Its weights should sum the combined inputs
+    internal_mlp_params = [
+        LinearParams(weight=jnp.ones((d_out, d_in + d_parent)), bias=jnp.zeros(d_out))
+    ]
+    internal_mlp = MLPModel(internal_mlp_params)
+    model = MLPEnhancementModel(internal_mlp)
+
+    # Create known inputs
+    xin = jnp.array([[1.0, 2.0]])  # Shape (1, 2)
+    parent_val = jnp.array([[3.0, 4.0, 5.0]])  # Shape (1, 3)
+
+    # The model should concatenate these to [1, 2, 3, 4, 5] and then sum them.
+    expected_output = jnp.array([[1.0 + 2.0 + 3.0 + 4.0 + 5.0]])  # = [[15.0]]
+
+    actual_output = model.run(xin, parent_val)
+
+    assert jnp.allclose(actual_output, expected_output)
+
+
+def test_pce_basis_hermite_correctness():
+    """Unit Test: Verify Hermite basis matrix for a known simple case."""
+    # For 1D, degree 2, the basis functions are: H0, H1, H2
+    # H0(x) = 1, H1(x) = x, H2(x) = x^2 - 1 (unnormalized)
+    # H0n=1, H1n=x, H2n=(x^2-1)/sqrt(2)
+    x = jnp.array([[2.0]])  # A single sample at x=2
+    multi_indices = jnp.array([[0], [1], [2]])
+    degree = 2
+
+    basis = build_poly_basis(x, multi_indices, "hermite", degree)
+
+    expected_basis = jnp.array(
+        [
+            [
+                1.0,  # H0
+                2.0,  # H1
+                (2.0**2 - 1) / jnp.sqrt(2.0),  # H2
+            ]
+        ]
+    )
+
+    assert jnp.allclose(basis, expected_basis)
+
+
+def test_pce_model_pytree_roundtrip(key):
+    """Unit Test: Ensure PCEModel can be flattened and unflattened."""
+    d_in, d_out, degree = 3, 2, 2
+    original_model = init_pce_model(key, d_in, d_out, degree)
+
+    leaves, treedef = tree_util.tree_flatten(original_model)
+    rebuilt_model = treedef.unflatten(leaves)
+
+    x_test = jax.random.normal(key, (1, d_in))
+
+    original_output = original_model.run(x_test)
+    rebuilt_output = rebuilt_model.run(x_test)
+
+    assert jnp.allclose(original_output, rebuilt_output)
+
+
+def test_pc_enhancement_model_pytree_roundtrip(key):
+    """Unit Test: Ensure PCEnhancementModel can be flattened and unflattened."""
+    d_in, d_parent, d_out, degree = 3, 2, 4, 2
+    original_model = init_pc_enhancement_model(key, d_in, d_parent, d_out, degree)
+
+    leaves, treedef = tree_util.tree_flatten(original_model)
+    rebuilt_model = treedef.unflatten(leaves)
+
+    x_test = jax.random.normal(key, (1, d_in))
+    parent_val = jax.random.normal(key, (1, d_parent))
+
+    original_output = original_model.run(x_test, parent_val)
+    rebuilt_output = rebuilt_model.run(x_test, parent_val)
+
+    assert jnp.allclose(original_output, rebuilt_output)
