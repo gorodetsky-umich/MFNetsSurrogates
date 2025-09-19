@@ -33,6 +33,7 @@ classifiers = [
 # These are the essential packages required for your library to run.
 dependencies = [
   "numpy>=1.24", # Loosen the pin from ~=2.1.0 unless you have a specific reason
+  "matplotlib",
   "scipy",
   "networkx",
   "jax",

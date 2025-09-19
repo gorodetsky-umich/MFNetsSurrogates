@@ -52,6 +52,10 @@ run-example: ## Run the basic training example script
 	@echo "--> Running basic training example..."
 	@python examples/basic_training.py
 
+run-mlp-graph: ## Run the basic training example script
+	@echo "--> Running MLP multiple graph example..."
+	@python examples/mlp_graph.py
+
 
 # ==============================================================================
 # CI & Cleanup

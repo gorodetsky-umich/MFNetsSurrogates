@@ -13,6 +13,7 @@ mfnets_surrogates/multinormal_test_results/
 *#*
 *.pyc
 
+plots*
 examples/cmdline/results*
 cmdline_yaml/example_results*
 *.log*

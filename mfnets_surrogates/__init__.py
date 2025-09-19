@@ -16,6 +16,7 @@ from .net_jax import (
     LinearScaleShiftModel,
     # Core graph class
     MFNetJax,
+    MLPEnhancementModel,
     MLPModel,
     MLPParams,
     # Base model class and parameter structures
@@ -24,6 +25,7 @@ from .net_jax import (
     # Helper functions for initialization and graph creation
     init_linear_params,
     init_linear_scale_shift_model,
+    init_mlp_enhancement_model,
     init_mlp_params,
     make_graph_2gen,
     # Loss functions

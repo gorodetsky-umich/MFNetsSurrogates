@@ -330,6 +330,48 @@ class MLPModel(Model):
         return x
 
 
+@register_pytree_node_class
+class MLPEnhancementModel(Model):
+    """
+    An enhancement model that uses an MLP to learn a correction.
+
+    This model is designed for higher-fidelity nodes. It calculates:
+    y = MLP(concat(x, parent_output))
+
+    This allows it to learn complex, non-linear relationships between a lower
+    fidelity model's output and the higher fidelity data.
+    """
+
+    def __init__(self, mlp: MLPModel):
+        """Initialize the model with its internal MLP."""
+        self.mlp = mlp
+
+    def tree_flatten(self):
+        """Flatten the model's internal MLP parameters."""
+        return (self.mlp,), {}
+
+    @classmethod
+    def tree_unflatten(cls, aux_data, children):
+        """Unflatten the model's internal MLP parameters."""
+        return cls(children[0])
+
+    def run(self, xin: jnp.ndarray, parent_val: jnp.ndarray) -> jnp.ndarray:
+        """
+        Evaluate the model on a batch of inputs and parent values.
+
+        Args:
+            xin: The primary input array of shape (n_samples, n_features).
+            parent_val: The output from parent nodes, shape (n_samples,
+                n_parent_features).
+
+        Returns
+        -------
+            The corrected output array.
+        """
+        combined_input = jnp.concatenate([xin, parent_val], axis=-1)
+        return self.mlp.run(combined_input)
+
+
 # --- Loss Functions ---
 
 
@@ -419,6 +461,15 @@ def init_linear_scale_shift_model(
         edge_model=LinearModel2D(edge_params),
         node_model=LinearModel(node_params),
     )
+
+
+def init_mlp_enhancement_model(
+    key: jax.Array, layer_sizes: list[int], activation: Callable = jnn.relu
+) -> MLPEnhancementModel:
+    """Initialize a complete MLPEnhancementModel."""
+    mlp_params = init_mlp_params(key, layer_sizes)
+    mlp_model = MLPModel(mlp_params, activation)
+    return MLPEnhancementModel(mlp_model)
 
 
 def make_graph_2gen(mod1: Model, mod2: Model) -> nx.DiGraph:
