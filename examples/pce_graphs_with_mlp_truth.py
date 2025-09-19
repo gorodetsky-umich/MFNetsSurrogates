@@ -6,10 +6,10 @@ This script performs the following steps:
 1. Defines a "true" 3-fidelity data-generating process using MLPs in a
    hierarchical graph structure (1 -> 2 -> 3).
 2. Generates training and testing data from this true process.
-3. Defines three candidate graph architectures: Peer, Hierarchical, and Exact.
-4. For each architecture, trains models using 1st, 2nd, and 3rd degree
+3. Defines two candidate graph architectures: Peer and Hierarchical.
+4. For each architecture, trains models using 1st, 2nd, 3rd, and 4th degree
    Polynomial Chaos Expansions (PCEs).
-5. Creates a single, comprehensive 4x3 plot that visualizes each graph
+5. Creates a single, comprehensive 2x5 plot that visualizes each graph
    structure and the prediction performance for each PCE degree.
 """
 import os
@@ -79,11 +79,12 @@ def plot_predictions_on_ax(ax, y_true, y_pred, mse: float, title: str):
     ax.set_aspect("equal", adjustable="box")
 
 
-def train_graph(mfnet: MFNetJax, x_train, y_train, num_steps=3000):
+def train_graph(mfnet: MFNetJax, x_train, y_train, num_steps=15000):
     """A helper function to run the Optax training loop for a given graph."""
     target_nodes = tuple(sorted(mfnet.graph.nodes))
     params, treedef = tree_util.tree_flatten(mfnet)
-    optimizer = optax.adam(learning_rate=1e-3)
+    # Use a lower learning rate for stability with higher-order polynomials
+    optimizer = optax.adam(learning_rate=5e-3)
     opt_state = optimizer.init(params)
 
     loss_fn = partial(_calculate_loss, treedef=treedef, target_nodes=target_nodes)
@@ -145,48 +146,41 @@ def main():
     y_test = tuple(y[test_indices] for y in y_all)
     y_true_hf = y_test[2]
 
-    # --- Setup for the combined 4x3 plot ---
-    fig, axes = plt.subplots(4, 3, figsize=(18, 22), dpi=120)
+    # --- Setup for the combined 2x5 plot (horizontal layout) ---
+    fig, axes = plt.subplots(2, 5, figsize=(28, 11), dpi=120)
     fig.suptitle(
-        "PCE Model Comparison: Architecture vs. Polynomial Degree", fontsize=24
+        "PCE Model Comparison (True Architecture: Hierarchical)", fontsize=24
     )
 
     graph_structures = {
-        "Peer": (nx.DiGraph([(1, 3), (2, 3)]), axes[:, 0]),
-        "Hierarchical": (nx.DiGraph([(1, 2), (2, 3)]), axes[:, 1]),
-        "Exact": (nx.DiGraph([(1, 2), (2, 3)]), axes[:, 2]),
+        "Peer": (nx.DiGraph([(1, 3), (2, 3)]), axes[0, :]),
+        "Hierarchical": (nx.DiGraph([(1, 2), (2, 3)]), axes[1, :]),
     }
 
     # 2. Loop through experiments
-    for name, (graph_struct, ax_col) in graph_structures.items():
+    for name, (graph_struct, ax_row) in graph_structures.items():
         print(f"\n--- 2. Training {name} Models ---")
-        plot_graph_on_ax(ax_col[0], graph_struct, f"{name} Graph Structure")
+        # First column is for the graph structure plot
+        plot_graph_on_ax(ax_row[0], graph_struct, f"{name} Graph Structure")
 
-        for degree in [1, 2, 3]:
+        # --- UPDATED: Loop includes degree 4 ---
+        for degree in [1, 2, 3, 4]:
             print(f"  Training with PCE Degree: {degree}...")
             key, pce_key = jax.random.split(key)
-
-            # --- FIX: Split the random key for each model initialization ---
             key1, key2, key3 = jax.random.split(pce_key, 3)
 
             if name == "Peer":
-                # Nodes 1 and 2 are root nodes
                 m1 = init_pce_model(key1, d_in, d_out, degree)
                 m2 = init_pce_model(key2, d_in, d_out, degree)
-                # Node 3 enhances both
                 m3 = init_pc_enhancement_model(
                     key3, d_in, d_out * 2, d_out, degree
                 )
                 nodes = [(1, m1), (2, m2), (3, m3)]
-            else:  # Hierarchical and Exact are the same for 3 fidelities
-                # Node 1 is a root node
+            else:  # Hierarchical
                 m1 = init_pce_model(key1, d_in, d_out, degree)
-                # Node 2 enhances node 1
                 m2 = init_pc_enhancement_model(key2, d_in, d_out, d_out, degree)
-                # Node 3 enhances node 2
                 m3 = init_pc_enhancement_model(key3, d_in, d_out, d_out, degree)
                 nodes = [(1, m1), (2, m2), (3, m3)]
-            # --- END FIX ---
 
             # Create and train the graph
             graph = nx.DiGraph(graph_struct.edges)
@@ -196,15 +190,16 @@ def main():
 
             mfnet_trained = train_graph(mfnet, x_train, y_train)
 
-            # Evaluate and plot
+            # Evaluate and plot in the correct column
             (y_pred,) = mfnet_trained.run((3,), x_test)
             test_mse = jnp.mean((y_true_hf - y_pred) ** 2)
+            # Plot starts from the second column (index 1)
             plot_predictions_on_ax(
-                ax_col[degree], y_true_hf, y_pred, test_mse, f"PCE Degree {degree}"
+                ax_row[degree], y_true_hf, y_pred, test_mse, f"PCE Degree {degree}"
             )
 
     # --- Finalize and Save the Combined Plot ---
-    plt.tight_layout(rect=[0, 0.03, 1, 0.96])
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
     save_path = "plots/pce_comparison.png"
     fig.savefig(save_path)
     plt.close(fig)
@@ -214,5 +209,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 
