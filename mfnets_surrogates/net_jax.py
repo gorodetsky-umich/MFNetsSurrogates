@@ -8,8 +8,7 @@ The design philosophy is to make the entire graph structure differentiable and
 optimizable with JAX-based tools.
 """
 
-from __future__ import annotations
-
+import sys
 from collections.abc import Callable
 from functools import partial
 from itertools import combinations_with_replacement
@@ -58,11 +57,15 @@ class MFNetJax:
         """
         self.graph = graph
         self.eval_order = list(nx.topological_sort(self.graph))
-        self.parents = {n: sorted(self.graph.predecessors(n)) for n in self.eval_order}
-        self.ancestors = {n: set(nx.ancestors(self.graph, n)) for n in self.eval_order}
+        self.parents = {
+            n: sorted(self.graph.predecessors(n)) for n in self.eval_order
+        }
+        self.ancestors = {
+            n: set(nx.ancestors(self.graph, n)) for n in self.eval_order
+        }
 
     def tree_flatten(self) -> tuple[list[Any], tuple[Any, ...]]:
-        """Flatten the MFNetJax into its dynamic leaves and static auxiliary data.
+        """Flatten the MFNetJax into its dynamic leaves and static data.
 
         This method is required for JAX PyTree registration.
         """
@@ -81,7 +84,9 @@ class MFNetJax:
         return leaves, aux_data
 
     @classmethod
-    def tree_unflatten(cls, aux_data: tuple[Any, ...], children: list[Any]) -> Self:
+    def tree_unflatten(
+        cls, aux_data: tuple[Any, ...], children: list[Any]
+    ) -> Self:
         """Reconstruct an MFNetJax from static data and dynamic leaves.
 
         This method is required for JAX PyTree registration.
@@ -108,7 +113,7 @@ class MFNetJax:
     def run(
         self, target_nodes: tuple[Any, ...], xinput: jnp.ndarray
     ) -> tuple[jnp.ndarray, ...]:
-        """Evaluate the graph to compute outputs for the specified target nodes."""
+        """Evaluate the graph for the specified target nodes."""
         needed: set[Any] = set()
         for t in target_nodes:
             needed.update(self.ancestors[t])
@@ -147,7 +152,9 @@ class Model:
         raise NotImplementedError
 
     @classmethod
-    def tree_unflatten(cls, aux_data: dict[str, Any], children: list[Any]) -> Self:
+    def tree_unflatten(
+        cls, aux_data: dict[str, Any], children: list[Any]
+    ) -> Self:
         """Unflatten parameter arrays back into a model instance."""
         raise NotImplementedError
 
@@ -160,16 +167,16 @@ class LinearModel(Model):
         """Initialize the model with its parameters."""
         self.params = params
 
-    def tree_flatten(self) -> tuple[list[LinearParams], dict[str, Any]]:
+    def tree_flatten(self) -> tuple[list[Any], dict[str, Any]]:
         """Flatten the model's parameters into a list of arrays (leaves)."""
         return [self.params], {}
 
     @classmethod
     def tree_unflatten(
-        cls, aux_data: dict[str, Any], children: list[LinearParams]
+        cls, aux_data: dict[str, Any], children: list[Any]
     ) -> Self:
         """Unflatten parameter arrays back into a model instance."""
-        return cls(children[0])
+        return cls(children[0])  # type: ignore
 
     def run(self, xin: jnp.ndarray) -> jnp.ndarray:
         """Evaluate the model on a batch of input data."""
@@ -178,43 +185,50 @@ class LinearModel(Model):
 
 @register_pytree_node_class
 class LinearModel2D(Model):
-    """Linear model with a 2D matrix output, typically for scaling matrices."""
+    """Linear model with a 2D matrix output for scaling matrices."""
 
     def __init__(self, params: LinearParams) -> None:
         """Initialize the model with its parameters."""
         self.params = params
 
-    def tree_flatten(self) -> tuple[list[LinearParams], dict[str, Any]]:
+    def tree_flatten(self) -> tuple[list[Any], dict[str, Any]]:
         """Flatten the model's parameters into a list of arrays (leaves)."""
         return [self.params], {}
 
     @classmethod
     def tree_unflatten(
-        cls, aux_data: dict[str, Any], children: list[LinearParams]
+        cls, aux_data: dict[str, Any], children: list[Any]
     ) -> Self:
         """Unflatten parameter arrays back into a model instance."""
-        return cls(children[0])
+        return cls(children[0])  # type: ignore
 
     def run(self, xin: jnp.ndarray) -> jnp.ndarray:
         """Evaluate the model on a batch of input data."""
-        return jnp.einsum("opi,si->sop", self.params.weight, xin) + self.params.bias
+        return (
+            jnp.einsum("opi,si->sop", self.params.weight, xin)
+            + self.params.bias
+        )
 
 
 @register_pytree_node_class
 class LinearScaleShiftModel(Model):
     """A model that computes a scale-and-shift correction."""
 
-    def __init__(self, edge_model: LinearModel2D, node_model: LinearModel) -> None:
+    def __init__(
+        self, edge_model: LinearModel2D, node_model: LinearModel
+    ) -> None:
         """Initialize the model with its edge and node sub-models."""
         self.edge_model = edge_model
         self.node_model = node_model
 
-    def tree_flatten(self) -> tuple[list[Model], dict[str, Any]]:
+    def tree_flatten(self) -> tuple[list[Any], dict[str, Any]]:
         """Flatten the model's parameters into a list of arrays (leaves)."""
         return [self.edge_model, self.node_model], {}
 
     @classmethod
-    def tree_unflatten(cls, aux_data: dict[str, Any], children: list[Model]) -> Self:
+    def tree_unflatten(
+        cls, aux_data: dict[str, Any], children: list[Any]
+    ) -> Self:
         """Unflatten parameter arrays back into a model instance."""
         return cls(children[0], children[1])  # type: ignore
 
@@ -273,14 +287,16 @@ class MLPEnhancementModel(Model):
         """Initialize the model with its internal MLP."""
         self.mlp_model = mlp_model
 
-    def tree_flatten(self) -> tuple[list[MLPModel], dict[str, Any]]:
+    def tree_flatten(self) -> tuple[list[Any], dict[str, Any]]:
         """Flatten the model's parameters into a list of arrays (leaves)."""
         return [self.mlp_model], {}
 
     @classmethod
-    def tree_unflatten(cls, aux_data: dict[str, Any], children: list[MLPModel]) -> Self:
+    def tree_unflatten(
+        cls, aux_data: dict[str, Any], children: list[Any]
+    ) -> Self:
         """Unflatten parameter arrays back into a model instance."""
-        return cls(children[0])
+        return cls(children[0])  # type: ignore
 
     def run(self, xin: jnp.ndarray, parent_val: jnp.ndarray) -> jnp.ndarray:
         """Evaluate the model on a batch of inputs and parent values."""
@@ -313,7 +329,9 @@ def _legendre_poly_1d(x: float, degree: int) -> jnp.ndarray:
     P = jnp.zeros(degree + 1).at[0].set(1.0).at[1].set(x)
 
     def body_fun(i: int, P_current: jnp.ndarray) -> jnp.ndarray:
-        val = ((2 * i - 1) * x * P_current[i - 1] - (i - 1) * P_current[i - 2]) / i
+        val = (
+            (2 * i - 1) * x * P_current[i - 1] - (i - 1) * P_current[i - 2]
+        ) / i
         return P_current.at[i].set(val)
 
     return cast(jnp.ndarray, lax.fori_loop(2, degree + 1, body_fun, P))
@@ -355,7 +373,9 @@ def build_poly_basis(
         p_vals_sample: jnp.ndarray, multi_indices_local: jnp.ndarray
     ) -> jnp.ndarray:
         n_dim = p_vals_sample.shape[0]
-        gathered = p_vals_sample[jnp.arange(n_dim)[:, None], multi_indices_local.T]
+        gathered = p_vals_sample[
+            jnp.arange(n_dim)[:, None], multi_indices_local.T
+        ]
         return jnp.prod(gathered, axis=0)
 
     return jax.vmap(build_for_sample, in_axes=(0, None))(p_vals, multi_indices)
@@ -378,7 +398,7 @@ class PCEModel(Model):
         self.degree = degree
         self.multi_indices = multi_indices
 
-    def tree_flatten(self) -> tuple[list[LinearParams], dict[str, Any]]:
+    def tree_flatten(self) -> tuple[list[Any], dict[str, Any]]:
         """Flatten the model into dynamic parameters and static data."""
         return [self.params], {
             "poly_type": self.poly_type,
@@ -390,10 +410,10 @@ class PCEModel(Model):
     def tree_unflatten(
         cls,
         aux_data: dict[str, Any],
-        children: list[LinearParams],
+        children: list[Any],
     ) -> Self:
         """Unflatten the model from its parameters and static data."""
-        return cls(children[0], **aux_data)
+        return cls(children[0], **aux_data)  # type: ignore
 
     def run(self, xin: jnp.ndarray) -> jnp.ndarray:
         """Evaluate the PCE model on a batch of inputs."""
@@ -420,7 +440,7 @@ class PCEModel2D(Model):
         self.degree = degree
         self.multi_indices = multi_indices
 
-    def tree_flatten(self) -> tuple[list[LinearParams], dict[str, Any]]:
+    def tree_flatten(self) -> tuple[list[Any], dict[str, Any]]:
         """Flatten the model into dynamic parameters and static data."""
         return [self.params], {
             "poly_type": self.poly_type,
@@ -432,10 +452,10 @@ class PCEModel2D(Model):
     def tree_unflatten(
         cls,
         aux_data: dict[str, Any],
-        children: list[LinearParams],
+        children: list[Any],
     ) -> Self:
         """Unflatten the model from its parameters and static data."""
-        return cls(children[0], **aux_data)
+        return cls(children[0], **aux_data)  # type: ignore
 
     def run(self, xin: jnp.ndarray) -> jnp.ndarray:
         """Evaluate the PCE model on a batch of inputs."""
@@ -455,12 +475,14 @@ class PCEAdditiveModel(Model):
         self.edge_model = edge_model
         self.node_model = node_model
 
-    def tree_flatten(self) -> tuple[list[Model], dict[str, Any]]:
+    def tree_flatten(self) -> tuple[list[Any], dict[str, Any]]:
         """Flatten the model's parameters into a list of arrays (leaves)."""
         return [self.edge_model, self.node_model], {}
 
     @classmethod
-    def tree_unflatten(cls, aux_data: dict[str, Any], children: list[Model]) -> Self:
+    def tree_unflatten(
+        cls, aux_data: dict[str, Any], children: list[Any]
+    ) -> Self:
         """Unflatten parameter arrays back into a model instance."""
         return cls(children[0], children[1])  # type: ignore
 
@@ -481,12 +503,14 @@ class PCEScaleShiftModel(Model):
         self.edge_model = edge_model
         self.node_model = node_model
 
-    def tree_flatten(self) -> tuple[list[Model], dict[str, Any]]:
+    def tree_flatten(self) -> tuple[list[Any], dict[str, Any]]:
         """Flatten the model's parameters into a list of arrays (leaves)."""
         return [self.edge_model, self.node_model], {}
 
     @classmethod
-    def tree_unflatten(cls, aux_data: dict[str, Any], children: list[Model]) -> Self:
+    def tree_unflatten(
+        cls, aux_data: dict[str, Any], children: list[Any]
+    ) -> Self:
         """Unflatten parameter arrays back into a model instance."""
         return cls(children[0], children[1])  # type: ignore
 
@@ -511,7 +535,8 @@ def mse_loss_graph(
     """Calculate the total mean squared error across multiple graph nodes."""
     pred_nodes = model.run(nodes, x)
     losses = [
-        jnp.mean((pred - true) ** 2) for pred, true in zip(pred_nodes, y, strict=False)
+        jnp.mean((pred - true) ** 2)
+        for pred, true in zip(pred_nodes, y, strict=False)
     ]
     return jnp.sum(jnp.array(losses))
 
@@ -526,7 +551,8 @@ def resid_loss_graph(
     """Calculate the flattened residual vector for least-squares solvers."""
     pred_nodes = model.run(nodes, x)
     residuals = [
-        (pred - true).ravel() for pred, true in zip(pred_nodes, y, strict=False)
+        (pred - true).ravel()
+        for pred, true in zip(pred_nodes, y, strict=False)
     ]
     return jnp.concatenate(residuals)
 
@@ -534,7 +560,9 @@ def resid_loss_graph(
 # --- Initializer Functions ---
 
 
-def init_linear_params(key: jax.Array, dim_in: int, dim_out: int) -> LinearParams:
+def init_linear_params(
+    key: jax.Array, dim_in: int, dim_out: int
+) -> LinearParams:
     """Initialize parameters for a LinearModel."""
     w_key, b_key = jax.random.split(key)
     weight = jax.random.normal(w_key, (dim_out, dim_in))
@@ -649,7 +677,9 @@ def init_pce_scale_shift_model(
 ) -> PCEScaleShiftModel:
     """Initialize a PCEScaleShiftModel."""
     edge_key, node_key = jax.random.split(key)
-    edge_model = init_pce_model_2d(edge_key, d_in, d_out, d_parent, degree, poly_type)
+    edge_model = init_pce_model_2d(
+        edge_key, d_in, d_out, d_parent, degree, poly_type
+    )
     node_model = init_pce_model(node_key, d_in, d_out, degree, poly_type)
     return PCEScaleShiftModel(edge_model, node_model)
 

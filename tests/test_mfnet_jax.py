@@ -8,7 +8,6 @@ import pytest
 from jax import tree_util
 from jax.tree_util import register_pytree_node_class
 
-# Import everything directly from your package's public API
 from mfnets_surrogates import (
     LinearModel,
     LinearParams,
@@ -33,12 +32,7 @@ from mfnets_surrogates import (
 # as it's not part of the public library.
 @register_pytree_node_class
 class ParentInputConcatenationModel(Model):
-    """
-    A test model that concatenates parent values and the primary input.
-
-    It then applies a single linear transformation. Its purpose is to directly
-    test the fan-in mechanism.
-    """
+    """A test model that concatenates parent and primary inputs."""
 
     def __init__(self, linear_model: LinearModel):
         """Initialize the model with its internal linear model."""
@@ -67,7 +61,7 @@ def key():
 
 
 def test_linear_model_output():
-    """Unit Test: Verify a LinearModel computes the correct mathematical result."""
+    """Verify a LinearModel computes the correct mathematical result."""
     # Define known, non-random weights and bias
     weight = jnp.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
     bias = jnp.array([10.0, 20.0])
@@ -88,7 +82,7 @@ def test_linear_model_output():
 
 
 def test_mfnet_pytree_roundtrip(key):
-    """Unit Test: Ensure MFNetJax objects can be flattened and unflattened."""
+    """Ensure MFNetJax objects can be flattened and unflattened."""
     d_in, d1_out, d2_out = 2, 2, 3
     key1, key2 = jax.random.split(key)
 
@@ -115,17 +109,22 @@ def test_mfnet_pytree_roundtrip(key):
 
 
 def test_graph_concatenates_peer_inputs():
-    """Test that MFNetJax.run correctly concatenates outputs from multiple parents."""
+    """Test MFNetJax.run correctly concatenates multiple parent outputs."""
     # --- 1. Setup Graph: (1 -> 3) and (2 -> 3) ---
     graph = nx.DiGraph()
     # Node 1: input dim 2, output dim 2
     graph.add_node(
-        1, func=LinearModel(LinearParams(jnp.ones((2, 2)), jnp.array([1.0, 1.0])))
+        1,
+        func=LinearModel(
+            LinearParams(jnp.ones((2, 2)), jnp.array([1.0, 1.0]))
+        ),
     )
     # Node 2: input dim 2, output dim 3
     graph.add_node(
         2,
-        func=LinearModel(LinearParams(jnp.ones((3, 2)), jnp.array([2.0, 2.0, 2.0]))),
+        func=LinearModel(
+            LinearParams(jnp.ones((3, 2)), jnp.array([2.0, 2.0, 2.0]))
+        ),
     )
 
     # --- 2. Setup Child Node (Node 3) ---
@@ -157,7 +156,7 @@ def test_graph_concatenates_peer_inputs():
 
 
 def test_end_to_end_training_overfit_with_optax(key):
-    """Integration Test: Check if the graph can overfit a small dataset using Optax."""
+    """Check if the graph can overfit a small dataset using Optax."""
     d_in, d1_out, d2_out = 2, 2, 3
     true_key, train_key, data_key = jax.random.split(key, 3)
 
@@ -170,10 +169,12 @@ def test_end_to_end_training_overfit_with_optax(key):
 
     # 2. Create a randomly initialized model to be trained
     train_model1 = LinearModel(init_linear_params(train_key, d_in, d1_out))
-    train_model2 = init_linear_scale_shift_model(train_key, d_in, d1_out, d2_out)
+    train_model2 = init_linear_scale_shift_model(
+        train_key, d_in, d1_out, d2_out
+    )
     mfnet_to_train = MFNetJax(make_graph_2gen(train_model1, train_model2))
 
-    # 3. Flatten the model into its parameters (leaves) and structure (treedef).
+    # 3. Flatten the model into its parameters and structure.
     params, treedef = tree_util.tree_flatten(mfnet_to_train)
     initial_params = params
 
@@ -210,7 +211,7 @@ def test_end_to_end_training_overfit_with_optax(key):
 
 
 def test_mlp_model_output_shape(key):
-    """Unit Test: Verify the MLP model produces the correct output shape."""
+    """Verify the MLP model produces the correct output shape."""
     layer_sizes = [10, 32, 5]  # 10-dim in, 32-dim hidden, 5-dim out
     params = init_mlp_params(key, layer_sizes)
     model = MLPModel(params)
@@ -222,7 +223,7 @@ def test_mlp_model_output_shape(key):
 
 
 def test_mlp_enhancement_model_output_shape(key):
-    """Unit Test: Verify the MLPEnhancementModel has the correct output shape."""
+    """Verify the MLPEnhancementModel has the correct output shape."""
     d_in, d_parent, d_out = 5, 3, 7
     batch_size = 100
 
@@ -237,7 +238,7 @@ def test_mlp_enhancement_model_output_shape(key):
 
 
 def test_mlp_enhancement_pytree_roundtrip(key):
-    """Unit Test: Ensure MLPEnhancementModel can be flattened and unflattened."""
+    """Ensure MLPEnhancementModel can be flattened and unflattened."""
     layer_sizes = [5, 16, 2]
     original_model = init_mlp_enhancement_model(key, layer_sizes)
 
@@ -253,11 +254,14 @@ def test_mlp_enhancement_pytree_roundtrip(key):
 
 
 def test_mlp_enhancement_concatenation_logic(key):
-    """Unit Test: Verify the MLPEnhancementModel correctly combines inputs."""
+    """Verify the MLPEnhancementModel correctly combines inputs."""
     d_in, d_parent, d_out = 2, 3, 1
 
     internal_mlp_params = [
-        LinearParams(weight=jnp.ones((d_out, d_in + d_parent)), bias=jnp.zeros(d_out))
+        LinearParams(
+            weight=jnp.ones((d_out, d_in + d_parent)),
+            bias=jnp.zeros(d_out),
+        )
     ]
     internal_mlp = MLPModel(internal_mlp_params)
     model = MLPEnhancementModel(internal_mlp)
@@ -271,7 +275,7 @@ def test_mlp_enhancement_concatenation_logic(key):
 
 
 def test_pce_basis_hermite_correctness():
-    """Unit Test: Verify Hermite basis matrix for a known simple case."""
+    """Verify Hermite basis matrix for a known simple case."""
     # For 1D, degree 2, the basis functions are: H0, H1, H2
     # H0n=1, H1n=x, H2n=(x^2-1)/sqrt(2)
     x = jnp.array([[2.0]])  # A single sample at x=2
@@ -294,7 +298,7 @@ def test_pce_basis_hermite_correctness():
 
 
 def test_pce_model_pytree_roundtrip(key):
-    """Unit Test: Ensure PCEModel can be flattened and unflattened."""
+    """Ensure PCEModel can be flattened and unflattened."""
     d_in, d_out, degree = 3, 2, 2
     original_model = init_pce_model(key, d_in, d_out, degree)
 
@@ -310,7 +314,7 @@ def test_pce_model_pytree_roundtrip(key):
 
 
 def test_pc_additive_model_pytree_roundtrip(key):
-    """Unit Test: Ensure PCEAdditiveModel can be flattened and unflattened."""
+    """Ensure PCEAdditiveModel can be flattened and unflattened."""
     d_in, d_parent, d_out, degree = 3, 2, 4, 2
     original_model = init_pc_additive_model(key, d_in, d_parent, d_out, degree)
 
@@ -327,9 +331,11 @@ def test_pc_additive_model_pytree_roundtrip(key):
 
 
 def test_pce_scale_shift_model_pytree_roundtrip(key):
-    """Unit Test: Ensure PCEScaleShiftModel can be flattened and unflattened."""
+    """Ensure PCEScaleShiftModel can be flattened and unflattened."""
     d_in, d_parent, d_out, degree = 3, 2, 4, 2
-    original_model = init_pce_scale_shift_model(key, d_in, d_parent, d_out, degree)
+    original_model = init_pce_scale_shift_model(
+        key, d_in, d_parent, d_out, degree
+    )
 
     leaves, treedef = tree_util.tree_flatten(original_model)
     rebuilt_model = treedef.unflatten(leaves)
