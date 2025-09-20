@@ -1,0 +1,46 @@
+name: Continuous Integration
+
+# This workflow runs on pushes and pull requests to the main branch
+on:
+  push:
+    branches: [ "jax" ]
+  pull_request:
+    branches: [ "jax" ]
+
+jobs:
+  build:
+    # Use the latest version of Ubuntu to run the job
+    runs-on: ubuntu-latest
+    
+    # Run jobs for a matrix of Python versions
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11"]
+
+    steps:
+      # 1. Check out the repository code
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      # 2. Set up the specified Python version
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      # 3. Cache dependencies to speed up subsequent runs
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-python-${{ matrix.python-version }}-pip-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-python-${{ matrix.python-version }}-pip-
+
+      # 4. Install all development dependencies using the Makefile
+      - name: Install dependencies
+        run: make install-dev
+
+      # 5. Run all CI checks (lint, type-check, test) using the Makefile
+      - name: Run CI checks
+        run: make ci
