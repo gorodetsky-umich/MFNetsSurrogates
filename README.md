@@ -18,10 +18,14 @@ The library is built on JAX to enable execution on hardware accelerators like GP
 ## **Installation**
 
 Install the package using pip. For a standard installation, run:  
+```
 pip install .
+```
 
 For development, it is recommended to install the package in editable mode with all development and testing dependencies:  
+```
 pip install \-e ".\[dev\]"
+```
 
 ## **Quick Start Example**
 
