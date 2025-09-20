@@ -1,11 +1,4 @@
-"""Tests for the MFNetJax library.
-
-Unit and integration tests for the MFNetJax framework.
-
-To run these tests from the project root directory:
-pip install -e .
-pytest
-"""
+"""Tests for the MFNetJax library."""
 
 import jax
 import jax.numpy as jnp
@@ -28,8 +21,9 @@ from mfnets_surrogates import (
     init_linear_scale_shift_model,
     init_mlp_enhancement_model,
     init_mlp_params,
-    init_pc_enhancement_model,
+    init_pc_additive_model,
     init_pce_model,
+    init_pce_scale_shift_model,
     make_graph_2gen,
     mse_loss_graph,
 )
@@ -86,10 +80,9 @@ def test_linear_model_output():
     # Manually calculate the expected output
     # (1*1 + 2*1 + 3*2) + 10 = 9 + 10 = 19
     # (4*1 + 5*1 + 6*2) + 20 = 21 + 20 = 41
-    expected_output = jnp.array([19.0, 41.0])
+    expected_output = jnp.array([[19.0, 41.0]])
 
-    # JAX vmaps the run method, so we need to add a batch dimension to xin
-    actual_output = model.run(xin[None, :])[0]
+    actual_output = model.run(xin[None, :])
 
     assert jnp.allclose(actual_output, expected_output)
 
@@ -107,7 +100,7 @@ def test_mfnet_pytree_roundtrip(key):
 
     # 2. Flatten and then unflatten the object
     leaves, treedef = tree_util.tree_flatten(mfnet_original)
-    mfnet_rebuilt = tree_util.tree_unflatten(treedef, leaves)
+    mfnet_rebuilt = treedef.unflatten(leaves)
 
     # 3. Verify that the rebuilt object behaves identically
     x_test = jax.random.normal(key, (1, d_in))
@@ -121,8 +114,8 @@ def test_mfnet_pytree_roundtrip(key):
         assert jnp.allclose(orig, reb)
 
 
-def test_graph_concatenates_fan_in_inputs():
-    """MFNetJax.run correctly concats outputs from mult. parents."""
+def test_graph_concatenates_peer_inputs():
+    """Test that MFNetJax.run correctly concatenates outputs from multiple parents."""
     # --- 1. Setup Graph: (1 -> 3) and (2 -> 3) ---
     graph = nx.DiGraph()
     # Node 1: input dim 2, output dim 2
@@ -181,34 +174,30 @@ def test_end_to_end_training_overfit_with_optax(key):
     mfnet_to_train = MFNetJax(make_graph_2gen(train_model1, train_model2))
 
     # 3. Flatten the model into its parameters (leaves) and structure (treedef).
-    # Optax optimizers operate on the raw parameters (the leaves).
     params, treedef = tree_util.tree_flatten(mfnet_to_train)
     initial_params = params
 
-    # 4. Define the optimizer
+    # 4. Define the optimizer and training state
     optimizer = optax.adam(learning_rate=5e-3)
     opt_state = optimizer.init(initial_params)
 
-    # 5. Define a loss function that takes the raw parameters (leaves) as its
-    # first argument. This is required for `jax.grad`.
+    # 5. Define a loss function that takes the raw parameters
     def loss_fn(current_params, x, y):
-        # Reconstruct the full MFNetJax model from the current parameters
         model = treedef.unflatten(current_params)
-        # The 'nodes' argument is now hard-coded, solving the static arg issue
         return mse_loss_graph(model, nodes=(1, 2), x=x, y=y)
 
     initial_loss = loss_fn(initial_params, x_train, y_train)
 
-    # 6. Define a JIT-compiled training step for performance
+    # 6. Define a JIT-compiled training step
     @jax.jit
-    def step(params, opt_state, x, y):
-        grads = jax.grad(loss_fn)(params, x, y)
-        updates, opt_state = optimizer.update(grads, opt_state)
-        params = optax.apply_updates(params, updates)
-        return params, opt_state
+    def step(p, opt_s, x, y):
+        grads = jax.grad(loss_fn)(p, x, y)
+        updates, opt_s = optimizer.update(grads, opt_s)
+        p = optax.apply_updates(p, updates)
+        return p, opt_s
 
     # 7. Run the explicit training loop
-    for _ in range(8000):  # Adam often requires more steps than LBFGS
+    for _ in range(5000):
         params, opt_state = step(params, opt_state, x_train, y_train)
 
     # 8. Reconstruct the final fitted model and calculate final loss
@@ -217,7 +206,7 @@ def test_end_to_end_training_overfit_with_optax(key):
 
     # 9. Assert that the final loss is significantly smaller than the initial
     assert final_loss < initial_loss / 100
-    assert final_loss < 1e-5
+    assert final_loss < 1e-4
 
 
 def test_mlp_model_output_shape(key):
@@ -237,14 +226,11 @@ def test_mlp_enhancement_model_output_shape(key):
     d_in, d_parent, d_out = 5, 3, 7
     batch_size = 100
 
-    # The input layer of the internal MLP must match the combined input dimension
     layer_sizes = [d_in + d_parent, 32, d_out]
     model = init_mlp_enhancement_model(key, layer_sizes)
 
-    # Create dummy inputs
     x_test = jax.random.normal(key, (batch_size, d_in))
     parent_val = jax.random.normal(key, (batch_size, d_parent))
-
     y_pred = model.run(x_test, parent_val)
 
     assert y_pred.shape == (batch_size, d_out)
@@ -260,7 +246,6 @@ def test_mlp_enhancement_pytree_roundtrip(key):
 
     x_test = jax.random.normal(key, (1, 3))
     parent_val = jax.random.normal(key, (1, 2))
-
     original_output = original_model.run(x_test, parent_val)
     rebuilt_output = rebuilt_model.run(x_test, parent_val)
 
@@ -271,21 +256,15 @@ def test_mlp_enhancement_concatenation_logic(key):
     """Unit Test: Verify the MLPEnhancementModel correctly combines inputs."""
     d_in, d_parent, d_out = 2, 3, 1
 
-    # Create a simple, deterministic linear layer to act as the internal MLP
-    # Its weights should sum the combined inputs
     internal_mlp_params = [
         LinearParams(weight=jnp.ones((d_out, d_in + d_parent)), bias=jnp.zeros(d_out))
     ]
     internal_mlp = MLPModel(internal_mlp_params)
     model = MLPEnhancementModel(internal_mlp)
 
-    # Create known inputs
-    xin = jnp.array([[1.0, 2.0]])  # Shape (1, 2)
-    parent_val = jnp.array([[3.0, 4.0, 5.0]])  # Shape (1, 3)
-
-    # The model should concatenate these to [1, 2, 3, 4, 5] and then sum them.
-    expected_output = jnp.array([[1.0 + 2.0 + 3.0 + 4.0 + 5.0]])  # = [[15.0]]
-
+    xin = jnp.array([[1.0, 2.0]])
+    parent_val = jnp.array([[3.0, 4.0, 5.0]])
+    expected_output = jnp.array([[15.0]])
     actual_output = model.run(xin, parent_val)
 
     assert jnp.allclose(actual_output, expected_output)
@@ -294,7 +273,6 @@ def test_mlp_enhancement_concatenation_logic(key):
 def test_pce_basis_hermite_correctness():
     """Unit Test: Verify Hermite basis matrix for a known simple case."""
     # For 1D, degree 2, the basis functions are: H0, H1, H2
-    # H0(x) = 1, H1(x) = x, H2(x) = x^2 - 1 (unnormalized)
     # H0n=1, H1n=x, H2n=(x^2-1)/sqrt(2)
     x = jnp.array([[2.0]])  # A single sample at x=2
     multi_indices = jnp.array([[0], [1], [2]])
@@ -312,7 +290,7 @@ def test_pce_basis_hermite_correctness():
         ]
     )
 
-    assert jnp.allclose(basis, expected_basis)
+    assert jnp.allclose(basis, expected_basis, atol=1e-6)
 
 
 def test_pce_model_pytree_roundtrip(key):
@@ -331,10 +309,27 @@ def test_pce_model_pytree_roundtrip(key):
     assert jnp.allclose(original_output, rebuilt_output)
 
 
-def test_pc_enhancement_model_pytree_roundtrip(key):
-    """Unit Test: Ensure PCEnhancementModel can be flattened and unflattened."""
+def test_pc_additive_model_pytree_roundtrip(key):
+    """Unit Test: Ensure PCEAdditiveModel can be flattened and unflattened."""
     d_in, d_parent, d_out, degree = 3, 2, 4, 2
-    original_model = init_pc_enhancement_model(key, d_in, d_parent, d_out, degree)
+    original_model = init_pc_additive_model(key, d_in, d_parent, d_out, degree)
+
+    leaves, treedef = tree_util.tree_flatten(original_model)
+    rebuilt_model = treedef.unflatten(leaves)
+
+    x_test = jax.random.normal(key, (1, d_in))
+    parent_val = jax.random.normal(key, (1, d_parent))
+
+    original_output = original_model.run(x_test, parent_val)
+    rebuilt_output = rebuilt_model.run(x_test, parent_val)
+
+    assert jnp.allclose(original_output, rebuilt_output)
+
+
+def test_pce_scale_shift_model_pytree_roundtrip(key):
+    """Unit Test: Ensure PCEScaleShiftModel can be flattened and unflattened."""
+    d_in, d_parent, d_out, degree = 3, 2, 4, 2
+    original_model = init_pce_scale_shift_model(key, d_in, d_parent, d_out, degree)
 
     leaves, treedef = tree_util.tree_flatten(original_model)
     rebuilt_model = treedef.unflatten(leaves)

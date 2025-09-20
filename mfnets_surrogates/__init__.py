@@ -1,13 +1,5 @@
-"""
-MFNetsSurrogates: A package for Multi-Fidelity Surrogate Networks.
+"""A JAX-based library for multi-fidelity surrogate modeling."""
 
-This package provides tools for building, training, and evaluating multi-fidelity
-surrogate models using computational graphs and JAX.
-"""
-
-# Import the core components from the JAX backend to make them
-# accessible directly from the top-level package. This creates a clean
-# and stable user-facing API.
 from .net_jax import (
     # Basic models
     LinearModel,
@@ -22,9 +14,11 @@ from .net_jax import (
     MLPParams,
     # Base classes and parameter structures
     Model,
+    PCEAdditiveModel,
     # PCE models
     PCEModel,
-    PCEnhancementModel,
+    PCEModel2D,
+    PCEScaleShiftModel,
     build_poly_basis,
     init_linear2d_params,
     # Initializer functions
@@ -32,8 +26,10 @@ from .net_jax import (
     init_linear_scale_shift_model,
     init_mlp_enhancement_model,
     init_mlp_params,
-    init_pc_enhancement_model,
+    init_pc_additive_model,
     init_pce_model,
+    init_pce_model_2d,
+    init_pce_scale_shift_model,
     # Graph helpers
     make_graph_2gen,
     # Loss functions
@@ -41,9 +37,6 @@ from .net_jax import (
     resid_loss_graph,
 )
 
-# Define the public API of the package.
-# This is a list of names that will be imported when a user does
-# `from mfnets_surrogates import *`. It also helps static analysis tools.
 __all__ = [
     "MFNetJax",
     "Model",
@@ -55,7 +48,9 @@ __all__ = [
     "MLPModel",
     "MLPEnhancementModel",
     "PCEModel",
-    "PCEnhancementModel",
+    "PCEModel2D",
+    "PCEAdditiveModel",
+    "PCEScaleShiftModel",
     "build_poly_basis",
     "mse_loss_graph",
     "resid_loss_graph",
@@ -65,6 +60,8 @@ __all__ = [
     "init_mlp_params",
     "init_mlp_enhancement_model",
     "init_pce_model",
-    "init_pc_enhancement_model",
+    "init_pce_model_2d",
+    "init_pc_additive_model",
+    "init_pce_scale_shift_model",
     "make_graph_2gen",
 ]
