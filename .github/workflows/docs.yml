@@ -1,0 +1,35 @@
+name: Deploy Documentation
+
+# Run this workflow every time a change is pushed to the main branch
+on:
+  push:
+    branches:
+      - jax
+
+# Allow this job to checkout the repo and write to the gh-pages branch
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. Check out the repository so the job can access it
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Set up Python
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # 3. Install the project's documentation dependencies
+      - name: Install dependencies
+        run: pip install .[docs]
+
+      # 4. Build the documentation and deploy it to the gh-pages branch
+      # This command automatically builds the site and pushes the
+      # static HTML files to the 'gh-pages' branch of your repo.
+      - name: Deploy documentation
+        run: mkdocs gh-deploy --force
