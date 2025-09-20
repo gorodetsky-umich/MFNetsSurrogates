@@ -4,20 +4,20 @@ A JAX-native library for building, training, and analyzing multi-fidelity surrog
 
 ## **Introduction**
 
-**MFNets-Surrogates** provides a powerful framework for fusing multiple sources of information. The core idea is to represent the relationships between different data fidelities (e.g., low vs. high-resolution simulations, or cheap vs. expensive experiments) as a **directed acyclic graph (DAG)**. The entire graph of models is end-to-end differentiable, allowing for efficient, gradient-based training of all model parameters simultaneously.  
-This library is built entirely on **JAX**, ensuring high performance on modern hardware accelerators like GPUs and TPUs.
+This library provides a framework for fusing multiple sources of information by representing the relationships between different data fidelities (e.g., low vs. high-resolution simulations) as a directed acyclic graph (DAG). The entire graph of models is end-to-end differentiable, allowing for gradient-based training of all model parameters simultaneously.  
+The library is built on JAX to enable execution on hardware accelerators like GPUs and TPUs.
 
 ## **Key Features**
 
-* **🚀 High-Performance JAX Core**: The entire library is built with JAX, leveraging jax.jit for compilation and jax.grad for optimization.  
-* **🌳 End-to-End Differentiable**: The MFNetJax class is registered as a JAX **PyTree**, making the entire graph structure transparent to JAX's transformations.  
-* **🕸️ Flexible Graph Structures**: Use the popular **NetworkX** library to define arbitrary directed acyclic graphs, giving you full control over the model architecture.  
-* **🧩 Composable Models**: Includes a suite of built-in models that can be used as nodes in the graph, including LinearModel, MLPModel, and PCEModel (Polynomial Chaos Expansion). The powerful PCEScaleShiftModel is ideal for hierarchical relationships.  
-* **🛠️ Modern Tooling**: Uses **Optax** for optimization, **Ruff** for linting and formatting, and **Pytest** for a comprehensive testing suite.
+* **JAX Core**: The library is built with JAX, utilizing jax.jit for compilation and jax.grad for automatic differentiation.  
+* **End-to-End Differentiable**: The MFNetJax class is registered as a JAX PyTree, making the graph structure transparent to JAX's transformations.  
+* **Flexible Graph Structures**: Uses NetworkX to define arbitrary directed acyclic graphs, giving control over the model architecture.  
+* **Composable Models**: Includes a suite of built-in models that can be used as nodes in the graph, including LinearModel, MLPModel, and PCEModel (Polynomial Chaos Expansion).  
+* **Modern Tooling**: Uses Optax for optimization, Ruff for linting and formatting, and Pytest for testing.
 
 ## **Installation**
 
-You can install the package directly using pip. For a standard installation, run:  
+Install the package using pip. For a standard installation, run:  
 pip install .
 
 For development, it is recommended to install the package in editable mode with all development and testing dependencies:  
@@ -26,87 +26,90 @@ pip install \-e ".\[dev\]"
 ## **Quick Start Example**
 
 Here is a complete example of how to define, train, and evaluate a simple two-fidelity hierarchical model (1 \-\> 2).  
-import jax  
-import jax.numpy as jnp  
-import networkx as nx  
-import optax  
-from jax import tree\_util
 
-from mfnets\_surrogates import (  
-    MFNetJax,  
-    LinearModel,  
-    LinearScaleShiftModel,  
-    init\_linear\_params,  
-    init\_linear\_scale\_shift\_model,  
-    mse\_loss\_graph,  
+```
+import jax
+import jax.numpy as jnp
+import networkx as nx
+import optax
+from jax import tree_util
+
+from mfnets_surrogates import (
+    MFNetJax,
+    LinearModel,
+    LinearScaleShiftModel,
+    init_linear_params,
+    init_linear_scale_shift_model,
+    mse_loss_graph,
 )
 
-def main():  
-    """A complete example of building, training, and running an MFNet."""  
-    key \= jax.random.PRNGKey(0)  
-    d\_in, d1\_out, d2\_out \= 2, 2, 3  
-    key, true\_key, train\_key, data\_key \= jax.random.split(key, 4\)
+def main():
+    """A complete example of building, training, and running an MFNet."""
+    key = jax.random.PRNGKey(0)
+    d_in, d1_out, d2_out = 2, 2, 3
+    key, true_key, train_key, data_key = jax.random.split(key, 4)
 
-    \# 1\. Define a "true" model and generate some training data  
-    true\_m1 \= LinearModel(init\_linear\_params(true\_key, d\_in, d1\_out))  
-    true\_m2 \= init\_linear\_scale\_shift\_model(true\_key, d\_in, d1\_out, d2\_out)  
-    true\_graph \= nx.DiGraph(\[(1, 2)\])  
-    true\_graph.add\_node(1, func=true\_m1)  
-    true\_graph.add\_node(2, func=true\_m2)  
-    true\_mfnet \= MFNetJax(true\_graph)
+    # 1. Define a "true" model and generate some training data
+    true_m1 = LinearModel(init_linear_params(true_key, d_in, d1_out))
+    true_m2 = init_linear_scale_shift_model(true_key, d_in, d1_out, d2_out)
+    true_graph = nx.DiGraph([(1, 2)])
+    true_graph.add_node(1, func=true_m1)
+    true_graph.add_node(2, func=true_m2)
+    true_mfnet = MFNetJax(true_graph)
 
-    x\_train \= jax.random.normal(data\_key, (100, d\_in))  
-    y\_train \= true\_mfnet.run((1, 2), x\_train)
+    x_train = jax.random.normal(data_key, (100, d_in))
+    y_train = true_mfnet.run((1, 2), x_train)
 
-    \# 2\. Create the MFNetJax model to be trained  
-    train\_m1 \= LinearModel(init\_linear\_params(train\_key, d\_in, d1\_out))  
-    train\_m2 \= init\_linear\_scale\_shift\_model(train\_key, d\_in, d1\_out, d2\_out)  
-    train\_graph\_struct \= nx.DiGraph(\[(1, 2)\])  
-    train\_graph\_struct.add\_node(1, func=train\_m1)  
-    train\_graph\_struct.add\_node(2, func=train\_m2)  
-    mfnet\_to\_train \= MFNetJax(train\_graph\_struct)
+    # 2. Create the MFNetJax model to be trained
+    train_m1 = LinearModel(init_linear_params(train_key, d_in, d1_out))
+    train_m2 = init_linear_scale_shift_model(train_key, d_in, d1_out, d2_out)
+    train_graph_struct = nx.DiGraph([(1, 2)])
+    train_graph_struct.add_node(1, func=train_m1)
+    train_graph_struct.add_node(2, func=train_m2)
+    mfnet_to_train = MFNetJax(train_graph_struct)
 
-    \# 3\. Set up the training loop with Optax  
-    params, treedef \= tree\_util.tree\_flatten(mfnet\_to\_train)  
-    optimizer \= optax.adam(learning\_rate=1e-3)  
-    opt\_state \= optimizer.init(params)
+    # 3. Set up the training loop with Optax
+    params, treedef = tree_util.tree_flatten(mfnet_to_train)
+    optimizer = optax.adam(learning_rate=1e-3)
+    opt_state = optimizer.init(params)
 
-    def loss\_fn(p, x, y):  
-        """Loss function that un-flattens parameters inside."""  
-        model \= treedef.unflatten(p)  
-        return mse\_loss\_graph(model, nodes=(1, 2), x=x, y=y)
+    def loss_fn(p, x, y):
+        """Loss function that un-flattens parameters inside."""
+        model = treedef.unflatten(p)
+        return mse_loss_graph(model, nodes=(1, 2), x=x, y=y)
 
-    @jax.jit  
-    def step(p, opt\_s, x, y):  
-        """A single JIT-compiled training step."""  
-        loss\_val, grads \= jax.value\_and\_grad(loss\_fn)(p, x, y)  
-        updates, opt\_s \= optimizer.update(grads, opt\_s)  
-        p \= optax.apply\_updates(p, updates)  
-        return p, opt\_s, loss\_val
+    @jax.jit
+    def step(p, opt_s, x, y):
+        """A single JIT-compiled training step."""
+        loss_val, grads = jax.value_and_grad(loss_fn)(p, x, y)
+        updates, opt_s = optimizer.update(grads, opt_s)
+        p = optax.apply_updates(p, updates)
+        return p, opt_s, loss_val
 
-    print("--- Starting Training \---")  
-    initial\_loss \= loss\_fn(params, x\_train, y\_train)  
-    print(f"Initial Loss: {initial\_loss:.4f}")
+    print("--- Starting Training ---")
+    initial_loss = loss_fn(params, x_train, y_train)
+    print(f"Initial Loss: {initial_loss:.4f}")
 
-    for i in range(2000):  
-        params, opt\_state, loss \= step(params, opt\_state, x\_train, y\_train)  
-        if (i \+ 1\) % 500 \== 0:  
+    for i in range(2000):
+        params, opt_state, loss = step(params, opt_state, x_train, y_train)
+        if (i + 1) % 500 == 0:
             print(f"  Step {i+1}, Loss: {loss:.4f}")
 
-    \# 4\. Make predictions with the final trained model  
-    mfnet\_fitted \= treedef.unflatten(params)  
-    x\_test \= jax.random.normal(data\_key, (10, d\_in))  
-    predictions \= mfnet\_fitted.run((1, 2), x\_test)
+    # 4. Make predictions with the final trained model
+    mfnet_fitted = treedef.unflatten(params)
+    x_test = jax.random.normal(data_key, (10, d_in))
+    predictions = mfnet_fitted.run((1, 2), x_test)
 
-    print("\\n--- Predictions from Node 2 (Highest Fidelity) \---")  
-    print(predictions\[1\])
+    print("\n--- Predictions from Node 2 (Highest Fidelity) ---")
+    print(predictions[1])
 
-if \_\_name\_\_ \== "\_\_main\_\_":  
+if __name__ == "__main__":
     main()
+```
 
 ## **Development & Usage**
 
-The Makefile provides several convenient commands for development:
+The Makefile provides several commands for development:
 
 * make install-dev: Installs the package in editable mode with all development dependencies.  
 * make lint: Formats the code with Ruff and automatically fixes linting errors.  
@@ -114,7 +117,9 @@ The Makefile provides several convenient commands for development:
 * make run-example: Runs one of the example scripts in the examples/ directory.
 
 Use the help command to see all available options:  
+```
 make help
+```
 
 ## **Citation**
 
@@ -125,4 +130,3 @@ If you use this code in your research, please cite the original paper:
 ## **License**
 
 This project is licensed under the **MIT License**.
-
