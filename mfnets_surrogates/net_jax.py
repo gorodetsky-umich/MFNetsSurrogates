@@ -8,10 +8,12 @@ The design philosophy is to make the entire graph structure differentiable and
 optimizable with JAX-based tools.
 """
 
+from __future__ import annotations
+
 from collections.abc import Callable
 from functools import partial
 from itertools import combinations_with_replacement
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, Self, cast
 
 import jax
 import jax.lax as lax
@@ -41,7 +43,7 @@ class MFNetJax:
         ancestors (dict): A mapping from each node to all its ancestors.
     """
 
-    def __init__(self, graph: nx.DiGraph):
+    def __init__(self, graph: nx.DiGraph) -> None:
         """Initialize the multifidelity network.
 
         Args:
@@ -53,13 +55,13 @@ class MFNetJax:
         self.parents = {n: sorted(self.graph.predecessors(n)) for n in self.eval_order}
         self.ancestors = {n: set(nx.ancestors(self.graph, n)) for n in self.eval_order}
 
-    def tree_flatten(self):
+    def tree_flatten(self) -> tuple[list[Any], tuple[Any, ...]]:
         """Flatten the MFNetJax into its dynamic leaves and static auxiliary data.
 
         This method is required for JAX PyTree registration.
         """
-        leaves = []
-        treedefs = []
+        leaves: list[Any] = []
+        treedefs: list[tree_util.PyTreeDef] = []
 
         for node in self.eval_order:
             func = self.graph.nodes[node]["func"]
@@ -73,7 +75,7 @@ class MFNetJax:
         return leaves, aux_data
 
     @classmethod
-    def tree_unflatten(cls, aux_data, children):
+    def tree_unflatten(cls, aux_data: tuple[Any, ...], children: list[Any]) -> Self:
         """Reconstruct an MFNetJax from static data and dynamic leaves.
 
         This method is required for JAX PyTree registration.
@@ -134,12 +136,12 @@ class LinearParams(NamedTuple):
 class Model:
     """Base class for all models to ensure they are registered as PyTrees."""
 
-    def tree_flatten(self):
+    def tree_flatten(self) -> tuple[list[Any], dict[str, Any]]:
         """Flatten the model's parameters into a list of arrays (leaves)."""
         raise NotImplementedError
 
     @classmethod
-    def tree_unflatten(cls, aux_data, children):
+    def tree_unflatten(cls, aux_data: dict[str, Any], children: list[Any]) -> Self:
         """Unflatten parameter arrays back into a model instance."""
         raise NotImplementedError
 
@@ -148,16 +150,18 @@ class Model:
 class LinearModel(Model):
     """A simple linear model: y = x @ W.T + b."""
 
-    def __init__(self, params: LinearParams):
+    def __init__(self, params: LinearParams) -> None:
         """Initialize the model with its parameters."""
         self.params = params
 
-    def tree_flatten(self):
+    def tree_flatten(self) -> tuple[list[LinearParams], dict[str, Any]]:
         """Flatten the model's parameters into a list of arrays (leaves)."""
-        return (self.params,), {}
+        return [self.params], {}
 
     @classmethod
-    def tree_unflatten(cls, aux_data, children):
+    def tree_unflatten(
+        cls, aux_data: dict[str, Any], children: list[LinearParams]
+    ) -> Self:
         """Unflatten parameter arrays back into a model instance."""
         return cls(children[0])
 
@@ -170,16 +174,18 @@ class LinearModel(Model):
 class LinearModel2D(Model):
     """Linear model with a 2D matrix output, typically for scaling matrices."""
 
-    def __init__(self, params: LinearParams):
+    def __init__(self, params: LinearParams) -> None:
         """Initialize the model with its parameters."""
         self.params = params
 
-    def tree_flatten(self):
+    def tree_flatten(self) -> tuple[list[LinearParams], dict[str, Any]]:
         """Flatten the model's parameters into a list of arrays (leaves)."""
-        return (self.params,), {}
+        return [self.params], {}
 
     @classmethod
-    def tree_unflatten(cls, aux_data, children):
+    def tree_unflatten(
+        cls, aux_data: dict[str, Any], children: list[LinearParams]
+    ) -> Self:
         """Unflatten parameter arrays back into a model instance."""
         return cls(children[0])
 
@@ -192,19 +198,19 @@ class LinearModel2D(Model):
 class LinearScaleShiftModel(Model):
     """A model that computes a scale-and-shift correction."""
 
-    def __init__(self, edge_model: LinearModel2D, node_model: LinearModel):
+    def __init__(self, edge_model: LinearModel2D, node_model: LinearModel) -> None:
         """Initialize the model with its edge and node sub-models."""
         self.edge_model = edge_model
         self.node_model = node_model
 
-    def tree_flatten(self):
+    def tree_flatten(self) -> tuple[list[Model], dict[str, Any]]:
         """Flatten the model's parameters into a list of arrays (leaves)."""
-        return (self.edge_model, self.node_model), {}
+        return [self.edge_model, self.node_model], {}
 
     @classmethod
-    def tree_unflatten(cls, aux_data, children):
+    def tree_unflatten(cls, aux_data: dict[str, Any], children: list[Model]) -> Self:
         """Unflatten parameter arrays back into a model instance."""
-        return cls(*children)
+        return cls(children[0], children[1])  # type: ignore
 
     def run(self, xin: jnp.ndarray, parent_val: jnp.ndarray) -> jnp.ndarray:
         """Evaluate the model: y = scale(x) @ parent_val + shift(x)."""
@@ -221,19 +227,27 @@ MLPParams = list[LinearParams]
 class MLPModel(Model):
     """A Multi-Layer Perceptron (MLP) model."""
 
-    def __init__(self, params: MLPParams, activation: Callable = jnn.relu):
+    def __init__(
+        self,
+        params: MLPParams,
+        activation: Callable[[jnp.ndarray], jnp.ndarray] = jnn.relu,
+    ) -> None:
         """Initialize the MLP with its parameters and activation function."""
         self.params = params
         self.activation = activation
 
-    def tree_flatten(self):
+    def tree_flatten(self) -> tuple[list[Any], dict[str, Any]]:
         """Flatten the model into its parameters and static data."""
-        return self.params, (self.activation,)
+        return self.params, {"activation": self.activation}
 
     @classmethod
-    def tree_unflatten(cls, aux_data, children):
+    def tree_unflatten(
+        cls,
+        aux_data: dict[str, Any],
+        children: list[Any],
+    ) -> Self:
         """Unflatten the model from its parameters and static data."""
-        return cls(children, aux_data[0])
+        return cls(children, aux_data["activation"])
 
     def run(self, xin: jnp.ndarray) -> jnp.ndarray:
         """Evaluate the MLP on a batch of input data."""
@@ -249,16 +263,16 @@ class MLPModel(Model):
 class MLPEnhancementModel(Model):
     """An MLP that enhances a low-fidelity input with a high-fidelity one."""
 
-    def __init__(self, mlp_model: MLPModel):
+    def __init__(self, mlp_model: MLPModel) -> None:
         """Initialize the model with its internal MLP."""
         self.mlp_model = mlp_model
 
-    def tree_flatten(self):
+    def tree_flatten(self) -> tuple[list[MLPModel], dict[str, Any]]:
         """Flatten the model's parameters into a list of arrays (leaves)."""
-        return (self.mlp_model,), {}
+        return [self.mlp_model], {}
 
     @classmethod
-    def tree_unflatten(cls, aux_data, children):
+    def tree_unflatten(cls, aux_data: dict[str, Any], children: list[MLPModel]) -> Self:
         """Unflatten parameter arrays back into a model instance."""
         return cls(children[0])
 
@@ -277,13 +291,13 @@ def _hermite_poly_1d(x: float, degree: int) -> jnp.ndarray:
         return jnp.ones(1)
     H = jnp.zeros(degree + 1).at[0].set(1.0).at[1].set(x)
 
-    def body_fun(i, H_current):
+    def body_fun(i: int, H_current: jnp.ndarray) -> jnp.ndarray:
         val = x * H_current[i - 1] - (i - 1) * H_current[i - 2]
         return H_current.at[i].set(val)
 
     H = lax.fori_loop(2, degree + 1, body_fun, H)
     factorial_vals = jnp.exp(jax.lax.lgamma(jnp.arange(degree + 1) + 1.0))
-    return H / jnp.sqrt(factorial_vals)
+    return cast(jnp.ndarray, H / jnp.sqrt(factorial_vals))
 
 
 def _legendre_poly_1d(x: float, degree: int) -> jnp.ndarray:
@@ -292,11 +306,11 @@ def _legendre_poly_1d(x: float, degree: int) -> jnp.ndarray:
         return jnp.ones(1)
     P = jnp.zeros(degree + 1).at[0].set(1.0).at[1].set(x)
 
-    def body_fun(i, P_current):
+    def body_fun(i: int, P_current: jnp.ndarray) -> jnp.ndarray:
         val = ((2 * i - 1) * x * P_current[i - 1] - (i - 1) * P_current[i - 2]) / i
         return P_current.at[i].set(val)
 
-    return lax.fori_loop(2, degree + 1, body_fun, P)
+    return cast(jnp.ndarray, lax.fori_loop(2, degree + 1, body_fun, P))
 
 
 def _compute_multi_indices(ndim: int, degree: int) -> np.ndarray:
@@ -321,6 +335,7 @@ def build_poly_basis(
     degree: int,
 ) -> jnp.ndarray:
     """Construct the PCE basis matrix for a batch of inputs."""
+    poly_1d_fn: Callable[[float, int], jnp.ndarray]
     if poly_type == "hermite":
         poly_1d_fn = _hermite_poly_1d
     elif poly_type == "legendre":
@@ -330,7 +345,9 @@ def build_poly_basis(
 
     p_vals = jax.vmap(jax.vmap(lambda val: poly_1d_fn(val, degree)))(x)
 
-    def build_for_sample(p_vals_sample, multi_indices_local):
+    def build_for_sample(
+        p_vals_sample: jnp.ndarray, multi_indices_local: jnp.ndarray
+    ) -> jnp.ndarray:
         n_dim = p_vals_sample.shape[0]
         gathered = p_vals_sample[jnp.arange(n_dim)[:, None], multi_indices_local.T]
         return jnp.prod(gathered, axis=0)
@@ -348,25 +365,29 @@ class PCEModel(Model):
         poly_type: str,
         degree: int,
         multi_indices: jnp.ndarray,
-    ):
+    ) -> None:
         """Initialize the PCE model."""
         self.params = params
         self.poly_type = poly_type
         self.degree = degree
         self.multi_indices = multi_indices
 
-    def tree_flatten(self):
+    def tree_flatten(self) -> tuple[list[LinearParams], dict[str, Any]]:
         """Flatten the model into dynamic parameters and static data."""
-        return (self.params,), (
-            self.poly_type,
-            self.degree,
-            self.multi_indices,
-        )
+        return [self.params], {
+            "poly_type": self.poly_type,
+            "degree": self.degree,
+            "multi_indices": self.multi_indices,
+        }
 
     @classmethod
-    def tree_unflatten(cls, aux_data, children):
+    def tree_unflatten(
+        cls,
+        aux_data: dict[str, Any],
+        children: list[LinearParams],
+    ) -> Self:
         """Unflatten the model from its parameters and static data."""
-        return cls(children[0], *aux_data)
+        return cls(children[0], **aux_data)
 
     def run(self, xin: jnp.ndarray) -> jnp.ndarray:
         """Evaluate the PCE model on a batch of inputs."""
@@ -386,25 +407,29 @@ class PCEModel2D(Model):
         poly_type: str,
         degree: int,
         multi_indices: jnp.ndarray,
-    ):
+    ) -> None:
         """Initialize the PCE model."""
         self.params = params
         self.poly_type = poly_type
         self.degree = degree
         self.multi_indices = multi_indices
 
-    def tree_flatten(self):
+    def tree_flatten(self) -> tuple[list[LinearParams], dict[str, Any]]:
         """Flatten the model into dynamic parameters and static data."""
-        return (self.params,), (
-            self.poly_type,
-            self.degree,
-            self.multi_indices,
-        )
+        return [self.params], {
+            "poly_type": self.poly_type,
+            "degree": self.degree,
+            "multi_indices": self.multi_indices,
+        }
 
     @classmethod
-    def tree_unflatten(cls, aux_data, children):
+    def tree_unflatten(
+        cls,
+        aux_data: dict[str, Any],
+        children: list[LinearParams],
+    ) -> Self:
         """Unflatten the model from its parameters and static data."""
-        return cls(children[0], *aux_data)
+        return cls(children[0], **aux_data)
 
     def run(self, xin: jnp.ndarray) -> jnp.ndarray:
         """Evaluate the PCE model on a batch of inputs."""
@@ -419,19 +444,19 @@ class PCEModel2D(Model):
 class PCEAdditiveModel(Model):
     """An additive enhancement model using PCE and a linear model."""
 
-    def __init__(self, edge_model: LinearModel, node_model: PCEModel):
+    def __init__(self, edge_model: LinearModel, node_model: PCEModel) -> None:
         """Initialize the model with its edge and node sub-models."""
         self.edge_model = edge_model
         self.node_model = node_model
 
-    def tree_flatten(self):
+    def tree_flatten(self) -> tuple[list[Model], dict[str, Any]]:
         """Flatten the model's parameters into a list of arrays (leaves)."""
-        return (self.edge_model, self.node_model), {}
+        return [self.edge_model, self.node_model], {}
 
     @classmethod
-    def tree_unflatten(cls, aux_data, children):
+    def tree_unflatten(cls, aux_data: dict[str, Any], children: list[Model]) -> Self:
         """Unflatten parameter arrays back into a model instance."""
-        return cls(*children)
+        return cls(children[0], children[1])  # type: ignore
 
     def run(self, xin: jnp.ndarray, parent_val: jnp.ndarray) -> jnp.ndarray:
         """Evaluate the model on a batch of inputs and parent values."""
@@ -445,19 +470,19 @@ class PCEAdditiveModel(Model):
 class PCEScaleShiftModel(Model):
     """An enhancement model using PCEs for both scale and shift terms."""
 
-    def __init__(self, edge_model: PCEModel2D, node_model: PCEModel):
+    def __init__(self, edge_model: PCEModel2D, node_model: PCEModel) -> None:
         """Initialize the model with its edge and node sub-models."""
         self.edge_model = edge_model
         self.node_model = node_model
 
-    def tree_flatten(self):
+    def tree_flatten(self) -> tuple[list[Model], dict[str, Any]]:
         """Flatten the model's parameters into a list of arrays (leaves)."""
-        return (self.edge_model, self.node_model), {}
+        return [self.edge_model, self.node_model], {}
 
     @classmethod
-    def tree_unflatten(cls, aux_data, children):
+    def tree_unflatten(cls, aux_data: dict[str, Any], children: list[Model]) -> Self:
         """Unflatten parameter arrays back into a model instance."""
-        return cls(*children)
+        return cls(children[0], children[1])  # type: ignore
 
     def run(self, xin: jnp.ndarray, parent_val: jnp.ndarray) -> jnp.ndarray:
         """Evaluate the model: y = PCE_edge(x) @ parent_val + PCE_node(x)."""
@@ -548,7 +573,7 @@ def init_mlp_params(key: jax.Array, layer_sizes: list[int]) -> MLPParams:
 def init_mlp_enhancement_model(
     key: jax.Array,
     layer_sizes: list[int],
-    activation: Callable = jnn.relu,
+    activation: Callable[[jnp.ndarray], jnp.ndarray] = jnn.relu,
 ) -> MLPEnhancementModel:
     """Initialize a complete MLPEnhancementModel."""
     mlp_params = init_mlp_params(key, layer_sizes)

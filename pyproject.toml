@@ -7,7 +7,7 @@ name = "mfnets-surrogates"
 description = "Multifidelity surrogate networks"
 readme = "README.md"
 requires-python = ">= 3.10"
-license = {text = "MIT License"}
+license = { text = "MIT License" }
 version = "0.0.1"
 keywords = [
     "Networks",
@@ -17,7 +17,7 @@ keywords = [
     "Multifidelity Modeling",
 ]
 authors = [
-  { name = "Alex Gorodetsky", email = "alex@alexgorodetsky.com" },
+    { name = "Alex Gorodetsky", email = "alex@alexgorodetsky.com" },
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -28,12 +28,12 @@ classifiers = [
 ]
 
 dependencies = [
-  "numpy>=1.24",
-  "matplotlib",
-  "scipy",
-  "networkx",
-  "jax",
-  "optax",
+    "numpy>=1.24",
+    "matplotlib",
+    "scipy",
+    "networkx",
+    "jax",
+    "optax",
 ]
 
 [project.optional-dependencies]
@@ -60,11 +60,13 @@ dev = [
     "mfnets-surrogates[test,torch,extras,docs]",
     "ruff",
     "mypy",
+    "scipy-stubs",  # Add stubs for scipy
 ]
 all = ["mfnets-surrogates[dev,torch,extras]"]
 
 
 [project.urls]
+Homepage = "https://github.com/gorodetsky-umich/MFNetsSurrogates"
 Documentation = "https://gorodetsky-umich.github.io/MFNetsSurrogates/"
 Issues = "https://github.com/gorodetsky-umich/MFNetsSurrogates/issues"
 Source = "https://github.com/gorodetsky-umich/MFNetsSurrogates"
@@ -76,24 +78,14 @@ packages = ["mfnets_surrogates"]
 
 [tool.ruff]
 include = ["mfnets_surrogates/**/*.py", "tests/**/*.py", "pyproject.toml"]
-exclude = [
-    ".git",
-    "__pycache__",
-    "build",
-    "dist",
-    ".venv",
-]
+exclude = [".git", "__pycache__", "build", "dist", ".venv"]
 line-length = 88
 indent-width = 4
 target-version = "py311"
 
 [tool.ruff.lint]
-select = [
-    "F", "E", "W", "I", "B", "C4", "UP", "D",
-]
-ignore = [
-    "D100", "D104", "D107",
-]
+select = ["F", "E", "W", "I", "B", "C4", "UP", "D"]
+ignore = ["D100", "D104", "D107"]
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
 [tool.ruff.lint.per-file-ignores]
@@ -109,20 +101,20 @@ indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "auto"
 
-
 [tool.mypy]
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
 files = ["mfnets_surrogates/"]
-plugins = "numpy.typing.mypy_plugin"
+# Remove the deprecated numpy plugin
+# plugins = "numpy.typing.mypy_plugin"
 
 [[tool.mypy.overrides]]
 module = [
     'networkx',
-    'h5py',
     'matplotlib',
     'matplotlib.pyplot',
-    'pydantic'
 ]
 ignore_missing_imports = true
+
+
