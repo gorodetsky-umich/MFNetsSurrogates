@@ -2,6 +2,10 @@
 
 A JAX-native library for building, training, and analyzing multi-fidelity surrogate models using flexible, differentiable graph structures.
 
+## Documentation
+
+**For a full tutorial and API reference, see the [official documentation](https://goroda.github.io/MFNetsSurrogates/).**
+
 ## **Introduction**
 
 This library provides a framework for fusing multiple sources of information by representing the relationships between different data fidelities (e.g., low vs. high-resolution simulations) as a directed acyclic graph (DAG). The entire graph of models is end-to-end differentiable, allowing for gradient-based training of all model parameters simultaneously.  
@@ -115,10 +119,11 @@ if __name__ == "__main__":
 
 The Makefile provides several commands for development:
 
-* make install-dev: Installs the package in editable mode with all development dependencies.  
-* make lint: Formats the code with Ruff and automatically fixes linting errors.  
-* make test: Runs the complete test suite using pytest.  
-* make run-example: Runs one of the example scripts in the examples/ directory.
+* `make install-dev`: Installs the package in editable mode with all development dependencies.  
+* `make lint`: Formats the code with Ruff and automatically fixes linting errors.  
+* `make docs`: Builds and serves the documentation locally
+* `make test`: Runs the complete test suite using pytest.  
+* `make run-example`: Runs one of the example scripts in the examples/ directory.
 
 Use the help command to see all available options:  
 ```

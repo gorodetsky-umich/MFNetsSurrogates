@@ -3,10 +3,8 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-# Convention is to use lowercase and hyphens for the package name
 name = "mfnets-surrogates"
 description = "Multifidelity surrogate networks"
-# Point to your README file
 readme = "README.md"
 requires-python = ">= 3.10"
 license = {text = "MIT License"}
@@ -29,10 +27,8 @@ classifiers = [
     "Topic :: Scientific/Engineering",
 ]
 
-# --- Core Dependencies ---
-# These are the essential packages required for your library to run.
 dependencies = [
-  "numpy>=1.24", # Loosen the pin from ~=2.1.0 unless you have a specific reason
+  "numpy>=1.24",
   "matplotlib",
   "scipy",
   "networkx",
@@ -40,39 +36,37 @@ dependencies = [
   "optax",
 ]
 
-# --- Optional Dependencies ---
-# These are "extras" that can be installed as needed.
-# Example installation:
-#   pip install .[test]
-#   pip install .[dev]
-#   pip install .[all]
 [project.optional-dependencies]
 torch = [
     "torch",
     "pyro-ppl",
 ]
-# For users who need pydantic/yaml features
 extras = [
     "pydantic",
     "scikit-learn",
     "pandas",
-    "matplotlib", # for plotting
+    "matplotlib",
     "pyyaml>=6.0",
 ]
 test = [
     "pytest",
 ]
+# Add a new 'docs' group
+docs = [
+    "mkdocs",
+    "mkdocs-material",
+    "mkdocstrings[python]",
+]
 dev = [
-    "mfnets-surrogates[test,torch,extras]", # Include other extras in the 'dev' group
+    "mfnets-surrogates[test,torch,extras,docs]",
     "ruff",
     "mypy",
 ]
-# An 'all' group is a common convenience
 all = ["mfnets-surrogates[dev,torch,extras]"]
 
 
 [project.urls]
-Documentation = "https://www.alexgorodetsky.com/mfnets_surrogate_code/net.html"
+Documentation = "https://goroda.github.io/MFNetsSurrogates/"
 Issues = "https://github.com/goroda/MFNetsSurrogates/issues"
 Source = "https://github.com/goroda/MFNetsSurrogates"
 
@@ -81,14 +75,7 @@ Source = "https://github.com/goroda/MFNetsSurrogates"
 packages = ["mfnets_surrogates"]
 
 
-# --------------------------------------------------------------------------
-# --- Tooling Configuration ---
-# All linting, formatting, and type checking is configured below.
-# Pylint and Flake8 configurations have been removed in favor of Ruff.
-# --------------------------------------------------------------------------
-
 [tool.ruff]
-# Define the directories Ruff should scan.
 include = ["mfnets_surrogates/**/*.py", "tests/**/*.py", "pyproject.toml"]
 exclude = [
     ".git",
@@ -97,35 +84,22 @@ exclude = [
     "dist",
     ".venv",
 ]
-line-length = 88  # The modern standard, matching Black formatter.
+line-length = 88
 indent-width = 4
 target-version = "py311"
 
 [tool.ruff.lint]
-# A more comprehensive set of rules to replace flake8 and pylint.
-# See the Ruff documentation for what each code means.
 select = [
-    "F",   # Pyflakes (syntax errors)
-    "E",   # Pycodestyle (style errors)
-    "W",   # Pycodestyle (style warnings)
-    "I",   # isort (import sorting)
-    "B",   # flake8-bugbear (common bugs)
-    "C4",  # flake8-comprehensions (unnecessary comprehensions)
-    "UP",  # pyupgrade (use modern syntax)
-    "D",   # pydocstyle (docstring conventions)
+    "F", "E", "W", "I", "B", "C4", "UP", "D",
 ]
 ignore = [
-    "D100", # Missing docstring in public module
-    "D104", # Missing docstring in public package
-    "D107", # Missing docstring in __init__
+    "D100", "D104", "D107",
 ]
-
-# Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
-"tests/*" = ["D103"] # Missing docstring in public function for tests
+"tests/*" = ["D103"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "numpy"
@@ -138,7 +112,6 @@ line-ending = "auto"
 
 
 [tool.mypy]
-# Keep your mypy settings, they are good.
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true

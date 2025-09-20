@@ -1,7 +1,7 @@
 # Makefile for MFNetsSurrogates project
 
 .DEFAULT_GOAL := help
-.PHONY: help install install-dev lint format check check-format type-check test clean ci run-example
+.PHONY: help install install-dev lint format check check-format type-check test clean ci run-example docs
 
 # ==============================================================================
 # Installation
@@ -44,6 +44,12 @@ test: ## Run all tests with pytest
 	@echo "--> Running all tests with pytest..."
 	pytest
 
+# ==============================================================================
+# Documentation
+# ==============================================================================
+docs: ## Build and serve the documentation locally
+	@echo "--> Building and serving documentation at http://127.0.0.1:8000"
+	@mkdocs serve
 
 # ==============================================================================
 # Examples
@@ -70,7 +76,7 @@ ci: check-format check type-check test ## Run all checks for Continuous Integrat
 
 clean: ## Clean up build artifacts, caches, and temp files
 	@echo "--> Cleaning up build artifacts and caches..."
-	rm -rf build/ dist/ .eggs/ *.egg-info/
+	rm -rf build/ dist/ .eggs/ *.egg-info/ site/
 	find . -type f -name "*.py[co]" -delete
 	find . -type d -name "__pycache__" -delete
 	find . -type d -name ".pytest_cache" -exec rm -rf {} +

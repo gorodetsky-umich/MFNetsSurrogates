@@ -1,0 +1,38 @@
+site_name: MFNets-Surrogates
+site_author: Alex Gorodetsky
+repo_url: https://github.com/goroda/MFNetsSurrogates
+edit_uri: ""
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.top
+
+nav:
+  - 'index.md'
+  - 'tutorial.md'
+  - 'api.md'
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            show_root_heading: yes
+            show_source: no
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
