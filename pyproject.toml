@@ -7,7 +7,7 @@ name = "mfnets-surrogates"
 description = "Multifidelity surrogate networks"
 readme = "README.md"
 requires-python = ">= 3.10"
-license = { text = "MIT License" }
+license = {text = "MIT License"}
 version = "0.0.1"
 keywords = [
     "Networks",
@@ -34,6 +34,8 @@ dependencies = [
     "networkx",
     "jax",
     "optax",
+    # Add typing_extensions for backward compatibility of Self type hint
+    "typing_extensions>=4.0; python_version<'3.11'",
 ]
 
 [project.optional-dependencies]
@@ -50,9 +52,9 @@ extras = [
 ]
 test = [
     "pytest",
+    "scipy-stubs",
 ]
 docs = [
-    "mkdocs",
     "mkdocs-material",
     "mkdocstrings[python]",
 ]
@@ -60,7 +62,6 @@ dev = [
     "mfnets-surrogates[test,torch,extras,docs]",
     "ruff",
     "mypy",
-    "scipy-stubs",  # Add stubs for scipy
 ]
 all = ["mfnets-surrogates[dev,torch,extras]"]
 
@@ -71,21 +72,29 @@ Documentation = "https://gorodetsky-umich.github.io/MFNetsSurrogates/"
 Issues = "https://github.com/gorodetsky-umich/MFNetsSurrogates/issues"
 Source = "https://github.com/gorodetsky-umich/MFNetsSurrogates"
 
-
 [tool.setuptools]
 packages = ["mfnets_surrogates"]
 
-
 [tool.ruff]
 include = ["mfnets_surrogates/**/*.py", "tests/**/*.py", "pyproject.toml"]
-exclude = [".git", "__pycache__", "build", "dist", ".venv"]
-line-length = 88
+exclude = [
+    ".git",
+    "__pycache__",
+    "build",
+    "dist",
+    ".venv",
+]
+line-length = 79
 indent-width = 4
-target-version = "py311"
+target-version = "py310"
 
 [tool.ruff.lint]
-select = ["F", "E", "W", "I", "B", "C4", "UP", "D"]
-ignore = ["D100", "D104", "D107"]
+select = [
+    "F", "E", "W", "I", "B", "C4", "UP", "D",
+]
+ignore = [
+    "D100", "D104", "D107",
+]
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
 [tool.ruff.lint.per-file-ignores]
@@ -106,15 +115,14 @@ warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
 files = ["mfnets_surrogates/"]
-# Remove the deprecated numpy plugin
-# plugins = "numpy.typing.mypy_plugin"
 
 [[tool.mypy.overrides]]
 module = [
     'networkx',
+    'h5py',
     'matplotlib',
     'matplotlib.pyplot',
+    'pydantic'
 ]
 ignore_missing_imports = true
-
 

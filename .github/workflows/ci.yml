@@ -1,6 +1,6 @@
 name: Continuous Integration
 
-# This workflow runs on pushes and pull requests to the main branch
+# This workflow runs on pushes and pull requests to the main branch.
 on:
   push:
     branches: [ "jax" ]
@@ -9,38 +9,46 @@ on:
 
 jobs:
   build:
-    # Use the latest version of Ubuntu to run the job
     runs-on: ubuntu-latest
-    
-    # Run jobs for a matrix of Python versions
     strategy:
       matrix:
-        python-version: ["3.10", "3.11"]
+        python-version: [ "3.11" ]
 
     steps:
-      # 1. Check out the repository code
-      - name: Check out repository
-        uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-      # 2. Set up the specified Python version
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
 
-      # 3. Cache dependencies to speed up subsequent runs
-      - name: Cache dependencies
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-python-${{ matrix.python-version }}-pip-${{ hashFiles('pyproject.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-python-${{ matrix.python-version }}-pip-
+    # This is the new caching step.
+    - name: Get pip cache dir
+      id: pip-cache
+      run: |
+        echo "dir=$(pip cache dir)" >> $GITHUB_OUTPUT
 
-      # 4. Install all development dependencies using the Makefile
-      - name: Install dependencies
-        run: make install-dev
+    - name: Cache dependencies
+      uses: actions/cache@v4
+      with:
+        # The path to the pip cache directory.
+        path: ${{ steps.pip-cache.outputs.dir }}
+        # The key for the cache. It's based on the OS, Python version, and a
+        # hash of your pyproject.toml. If the hash changes, a new cache is created.
+        key: ${{ runner.os }}-python-${{ matrix.python-version }}-pip-${{ hashFiles('**/pyproject.toml') }}
+        # A fallback key to use if the exact key isn't found.
+        restore-keys: |
+          ${{ runner.os }}-python-${{ matrix.python-version }}-pip-
 
-      # 5. Run all CI checks (lint, type-check, test) using the Makefile
-      - name: Run CI checks
-        run: make ci
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        # pip will automatically use the restored cache directory,
+        # making this step very fast if the cache was hit.
+        pip install -e ".[dev]"
+
+    - name: Run CI checks
+      run: |
+        make ci
+

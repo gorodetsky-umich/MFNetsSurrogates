@@ -13,7 +13,13 @@ from __future__ import annotations
 from collections.abc import Callable
 from functools import partial
 from itertools import combinations_with_replacement
-from typing import Any, NamedTuple, Self, cast
+from typing import Any, NamedTuple, cast
+
+# Conditionally import Self for backward compatibility with Python < 3.11
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
 
 import jax
 import jax.lax as lax
