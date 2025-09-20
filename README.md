@@ -4,7 +4,7 @@ A JAX-native library for building, training, and analyzing multi-fidelity surrog
 
 ## Documentation
 
-**For a full tutorial and API reference, see the [official documentation](https://goroda.github.io/MFNetsSurrogates/).**
+**For a full tutorial and API reference, see the [official documentation](https://gorodetsky-umich.github.io/MFNetsSurrogates/).**
 
 ## **Introduction**
 

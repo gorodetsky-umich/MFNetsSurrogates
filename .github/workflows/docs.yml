@@ -1,6 +1,6 @@
 name: Deploy Documentation
 
-# Run this workflow every time a change is pushed to the main branch
+# Run this workflow every time a change is pushed to the jax branch
 on:
   push:
     branches:

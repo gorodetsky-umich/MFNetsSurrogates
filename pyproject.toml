@@ -51,7 +51,6 @@ extras = [
 test = [
     "pytest",
 ]
-# Add a new 'docs' group
 docs = [
     "mkdocs",
     "mkdocs-material",
@@ -66,9 +65,9 @@ all = ["mfnets-surrogates[dev,torch,extras]"]
 
 
 [project.urls]
-Documentation = "https://goroda.github.io/MFNetsSurrogates/"
-Issues = "https://github.com/goroda/MFNetsSurrogates/issues"
-Source = "https://github.com/goroda/MFNetsSurrogates"
+Documentation = "https://gorodetsky-umich.github.io/MFNetsSurrogates/"
+Issues = "https://github.com/gorodetsky-umich/MFNetsSurrogates/issues"
+Source = "https://github.com/gorodetsky-umich/MFNetsSurrogates"
 
 
 [tool.setuptools]

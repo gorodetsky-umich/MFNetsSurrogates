@@ -1,6 +1,6 @@
 site_name: MFNets-Surrogates
 site_author: Alex Gorodetsky
-repo_url: https://github.com/goroda/MFNetsSurrogates
+repo_url: https://github.com/gorodetsky-umich/MFNetsSurrogates
 edit_uri: ""
 
 theme:
@@ -19,9 +19,9 @@ theme:
     - navigation.top
 
 nav:
-  - 'index.md'
-  - 'tutorial.md'
-  - 'api.md'
+  - 'Home': 'index.md'
+  - 'Tutorial': 'tutorial.md'
+  - 'API Reference': 'api.md'
 
 plugins:
   - search
@@ -36,3 +36,4 @@ markdown_extensions:
   - admonition
   - pymdownx.details
   - pymdownx.superfences
+
