@@ -24,7 +24,7 @@ pip install .
 
 For development, it is recommended to install the package in editable mode with all development and testing dependencies:  
 ```
-pip install \-e ".\[dev\]"
+pip install -e .
 ```
 
 ## **Quick Start Example**
