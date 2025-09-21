@@ -1,4 +1,5 @@
 """The command-line interface for MFNets-Surrogates."""
+import inspect
 import os
 import time
 from pathlib import Path
@@ -14,26 +15,30 @@ import yaml
 from jax import tree_util
 from rich.console import Console
 from rich.progress import track
+from rich.table import Table
 
+from mfnets_surrogates import net_jax
 from mfnets_surrogates.config import Config, TrainingParams
-from mfnets_surrogates.net_jax import (
-    MFNetJax,
-    init_mlp_enhancement_model,
-    init_pce_model,
-    init_pce_scale_shift_model,
-    mse_loss_graph,
-)
 
 app = typer.Typer(
     pretty_exceptions_show_locals=False
 )
 console = Console()
 
-MODEL_INITIALIZERS: dict[str, Callable[..., Any]] = {
-    "PCEModel": init_pce_model,
-    "PCEScaleShiftModel": init_pce_scale_shift_model,
-    "MLPEnhancementModel": init_mlp_enhancement_model,
-}
+
+def _discover_initializers() -> dict[str, Callable[..., Any]]:
+    """Scan the net_jax module to find all model initializer functions."""
+    initializers = {}
+    for name, func in inspect.getmembers(net_jax, inspect.isfunction):
+        if name.startswith("init_"):
+            model_name = name.replace("init_", "").replace("_", " ").title()
+            model_name = model_name.replace(" ", "")
+            initializers[model_name] = func
+    return initializers
+
+
+MODEL_INITIALIZERS = _discover_initializers()
+
 ACTIVATION_FUNCTIONS: dict[str, Callable[[jnp.ndarray], jnp.ndarray]] = {
     "relu": jax.nn.relu,
     "tanh": jax.nn.tanh,
@@ -87,7 +92,7 @@ def _load_training_data(
 
 def _build_mfnet_from_config(
     config: Config, dim_info: dict[int | str, tuple[int, int]]
-) -> MFNetJax:
+) -> net_jax.MFNetJax:
     """Build the MFNetJax object from the configuration."""
     console.print("Building MFNetJax graph from configuration...")
     key = jax.random.PRNGKey(42)
@@ -99,14 +104,23 @@ def _build_mfnet_from_config(
         key, model_key = jax.random.split(key)
         d_in, d_out = dim_info[node_id]
 
-        initializer = MODEL_INITIALIZERS.get(model_config.type)
+        # Perform a case-insensitive lookup for the initializer
+        initializer = next(
+            (
+                func
+                for key, func in MODEL_INITIALIZERS.items()
+                if key.lower() == model_config.type.lower()
+            ),
+            None,
+        )
+
         if initializer is None:
             console.print(f"[bold red]Unknown model type: {model_config.type}[/]")
             raise typer.Exit(code=1)
 
         init_kwargs = model_config.params.copy()
 
-        if model_config.type == "PCEModel":
+        if "pce" in model_config.type.lower():
             init_kwargs["dim_in"] = d_in
             init_kwargs["dim_out"] = d_out
         else:
@@ -116,9 +130,9 @@ def _build_mfnet_from_config(
         predecessors = sorted(list(graph.predecessors(node_id)))
         if predecessors:
             d_parent = sum(dim_info[p][1] for p in predecessors)
-            if model_config.type == "PCEScaleShiftModel":
+            if "scaleshift" in model_config.type.lower():
                 init_kwargs["d_parent"] = d_parent
-            elif model_config.type == "MLPEnhancementModel":
+            elif "enhancement" in model_config.type.lower():
                 init_kwargs["layer_sizes"].insert(0, d_in + d_parent)
 
         if "activation" in init_kwargs:
@@ -133,15 +147,15 @@ def _build_mfnet_from_config(
         graph.add_node(node_id, func=model_instance)
 
     console.print("[green]Successfully built MFNetJax graph.[/]")
-    return MFNetJax(graph)
+    return net_jax.MFNetJax(graph)
 
 
 def _train_network(
-    mfnet: MFNetJax,
+    mfnet: net_jax.MFNetJax,
     training_data: dict[str, Any],
     training_params: TrainingParams,
     config: Config,
-) -> MFNetJax:
+) -> net_jax.MFNetJax:
     """Run the training loop."""
     console.print(
         f"\nStarting training with {training_params.num_steps} steps..."
@@ -180,7 +194,7 @@ def _train_network(
         p: list[Any], x: jnp.ndarray, y: tuple[jnp.ndarray, ...]
     ) -> jnp.ndarray:
         model = treedef.unflatten(p)
-        return mse_loss_graph(model, nodes=target_nodes, x=x, y=y)
+        return net_jax.mse_loss_graph(model, nodes=target_nodes, x=x, y=y)
 
     @jax.jit
     def step(
@@ -205,7 +219,7 @@ def _train_network(
     return treedef.unflatten(params)
 
 
-def _process_prediction_tasks(mfnet: MFNetJax, config: Config) -> None:
+def _process_prediction_tasks(mfnet: net_jax.MFNetJax, config: Config) -> None:
     """Run and save all prediction tasks specified in the config."""
     console.print("\nProcessing prediction tasks...")
     prediction_datasets = [d for d in config.datasets if d.type == "prediction"]
@@ -242,12 +256,31 @@ def _process_prediction_tasks(mfnet: MFNetJax, config: Config) -> None:
         if task.output_path:
             output_path = Path(task.output_path)
             output_path.parent.mkdir(parents=True, exist_ok=True)
-            np.savez(output_path, y_predict=y_predict)
+            np.savez(output_path, y_predict=y_predict, x_predict=x_predict)
             console.print(f"[green]Successfully saved predictions to '{output_path}'[/green]")
         else:
             console.print(
                 f"[yellow]No output_path for task '{task.name}'. Skipping save.[/yellow]"
             )
+
+@app.command()
+def list_models() -> None:
+    """List all available models and their required parameters."""
+    console.print("[bold]Available Models for Configuration:[/bold]")
+    table = Table(title="Model Initializers")
+    table.add_column("Config Name", style="cyan", no_wrap=True)
+    table.add_column("Parameters", style="magenta")
+
+    for name, func in MODEL_INITIALIZERS.items():
+        sig = inspect.signature(func)
+        params = [
+            p
+            for p in sig.parameters
+            if p not in ["key", "d_in", "d_out", "dim_in", "dim_out", "d_parent"]
+        ]
+        table.add_row(name, ", ".join(params))
+
+    console.print(table)
 
 
 @app.command()
