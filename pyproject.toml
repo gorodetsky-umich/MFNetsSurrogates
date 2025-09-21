@@ -34,7 +34,6 @@ dependencies = [
     "networkx",
     "jax",
     "optax",
-    # Add typing_extensions for backward compatibility of Self type hint
     "typing_extensions>=4.0; python_version<'3.11'",
 ]
 
@@ -43,11 +42,10 @@ torch = [
     "torch",
     "pyro-ppl",
 ]
-extras = [
+# CLI dependencies are now in a dedicated group
+cli = [
+    "typer[all]",
     "pydantic",
-    "scikit-learn",
-    "pandas",
-    "matplotlib",
     "pyyaml>=6.0",
 ]
 test = [
@@ -59,12 +57,11 @@ docs = [
     "mkdocstrings[python]",
 ]
 dev = [
-    "mfnets-surrogates[test,torch,extras,docs]",
+    "mfnets-surrogates[test,torch,cli,docs]", # Add 'cli' to dev
     "ruff",
     "mypy",
 ]
-all = ["mfnets-surrogates[dev,torch,extras]"]
-
+all = ["mfnets-surrogates[dev,torch,cli]"]
 
 [project.urls]
 Homepage = "https://github.com/gorodetsky-umich/MFNetsSurrogates"
@@ -72,9 +69,14 @@ Documentation = "https://gorodetsky-umich.github.io/MFNetsSurrogates/"
 Issues = "https://github.com/gorodetsky-umich/MFNetsSurrogates/issues"
 Source = "https://github.com/gorodetsky-umich/MFNetsSurrogates"
 
+# This section creates the 'mfnets-run' command
+[project.scripts]
+mfnets-run = "mfnets_surrogates.cli:app"
+
 [tool.setuptools]
 packages = ["mfnets_surrogates"]
 
+# ... (rest of the file is unchanged) ...
 [tool.ruff]
 include = ["mfnets_surrogates/**/*.py", "tests/**/*.py", "pyproject.toml"]
 exclude = [

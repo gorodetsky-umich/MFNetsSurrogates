@@ -26,3 +26,5 @@ backup*
 
 
 examples/graph_learn/results
+examples/cli_tool/*.npz
+results/

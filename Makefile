@@ -1,7 +1,7 @@
 # Makefile for MFNetsSurrogates project
 
 .DEFAULT_GOAL := help
-.PHONY: help install install-dev lint format check check-format type-check test clean ci run-example docs
+.PHONY: help install install-dev lint format check check-format type-check test clean ci docs
 
 # ==============================================================================
 # Installation
@@ -12,7 +12,7 @@ install: ## Install the package in standard mode
 	python -m pip install .
 
 install-dev: ## Install the package in editable mode with all dev dependencies
-	@echo "--> Installing the package in editable mode with all development dependencies..."
+	@echo "--> Installing package in editable mode with dev dependencies..."
 	python -m pip install -e ".[dev]"
 
 # ==============================================================================
@@ -48,7 +48,7 @@ test: ## Run all tests with pytest
 # Documentation
 # ==============================================================================
 docs: ## Build and serve the documentation locally
-	@echo "--> Building and serving documentation at http://127.0.0.1:8000"
+	@echo "--> Building and serving documentation at http://12.0.0.1:8000"
 	@mkdocs serve
 
 # ==============================================================================
@@ -66,6 +66,12 @@ run-pce-graph: ## Run an example showing PCE nodes with multiple graphs on MLP t
 	@echo "--> Running PCE graph example..."
 	@python examples/pce_graphs_with_mlp_truth.py
 
+run-cli-example: ## Generate data and run the full CLI tool example
+	@echo "--> Generating data for CLI example..."
+	@python examples/cli_tool/generate_data.py
+	@echo "--> Running CLI tool with example config..."
+	@mfnets-run --config examples/cli_tool/config.yml
+
 
 # ==============================================================================
 # CI & Cleanup
@@ -76,7 +82,8 @@ ci: check-format check type-check test ## Run all checks for Continuous Integrat
 
 clean: ## Clean up build artifacts, caches, and temp files
 	@echo "--> Cleaning up build artifacts and caches..."
-	rm -rf build/ dist/ .eggs/ *.egg-info/ site/
+	# Updated to include the 'results' and 'site' directories
+	rm -rf build/ dist/ .eggs/ *.egg-info/ site/ results/
 	find . -type f -name "*.py[co]" -delete
 	find . -type d -name "__pycache__" -delete
 	find . -type d -name ".pytest_cache" -exec rm -rf {} +
@@ -89,5 +96,4 @@ clean: ## Clean up build artifacts, caches, and temp files
 help: ## Show this help message
 	@echo "Available commands:"
 	@grep -E '^[a-zA-Z_-]+:.*?##' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
-
 

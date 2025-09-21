@@ -1,0 +1,40 @@
+# Example configuration for the MFNets CLI tool
+
+graph:
+  nodes: [1, 2, 3]
+  edges:
+    - [1, 2]
+    - [2, 3]
+
+models:
+  1: # Low-fidelity model
+    type: "PCEModel"
+    params:
+      degree: 2
+      poly_type: "hermite"
+  2: # Mid-fidelity enhancement model
+    type: "PCEScaleShiftModel"
+    params:
+      degree: 2
+  3: # High-fidelity enhancement model
+    type: "PCEScaleShiftModel"
+    params:
+      degree: 3
+
+training:
+  learning_rate: 0.005
+  num_steps: 8000
+
+datasets:
+  # The dataset used for training the entire graph
+  - name: "training_set"
+    type: "training"
+    data_path: "examples/cli_tool/training_data.npz"
+    nodes: [1, 2, 3] # This file contains data for all three nodes
+
+  # A task to generate predictions using the final trained model
+  - name: "prediction_grid"
+    type: "prediction"
+    data_path: "examples/cli_tool/prediction_inputs.npz"
+    nodes: [3] # We only want predictions from the high-fidelity node
+    output_path: "results/predictions.npz"
