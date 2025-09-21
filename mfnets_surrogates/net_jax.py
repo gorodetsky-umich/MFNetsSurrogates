@@ -26,9 +26,52 @@ import jax.nn as jnn
 import jax.numpy as jnp
 import networkx as nx
 import numpy as np
+import optax
 from jax import tree_util
 from jax.tree_util import register_pytree_node_class
+from optax import OptState
 from scipy.special import comb
+from tqdm import trange  # progress bar
+
+# --- Loss Functions ---
+
+
+@partial(jax.jit, static_argnums=(1,))
+def mse_loss_graph(
+    model: "MFNetJax",
+    nodes: tuple[Any, ...],
+    x_list: list[jnp.ndarray],
+    y_list: list[jnp.ndarray],
+) -> jnp.ndarray:
+    """Calculate total MSE across nodes with potentially different inputs."""
+    losses = []
+    for i, node in enumerate(nodes):
+        x_i = x_list[i]
+        y_i = y_list[i]
+        # Run the graph to get the prediction for the i-th node on its data
+        (pred_i,) = model.run((node,), x_i)
+        losses.append(jnp.mean((pred_i - y_i) ** 2))
+    return jnp.sum(jnp.array(losses))
+
+
+@partial(jax.jit, static_argnums=(1,))
+def resid_loss_graph(
+    model: "MFNetJax",
+    nodes: tuple[Any, ...],
+    x_list: list[jnp.ndarray],
+    y_list: list[jnp.ndarray],
+) -> jnp.ndarray:
+    """Calculate the flattened residual vector for least-squares solvers."""
+    residuals = []
+    for i, node in enumerate(nodes):
+        x_i = x_list[i]
+        y_i = y_list[i]
+        (pred_i,) = model.run((node,), x_i)
+        residuals.append((pred_i - y_i).ravel())
+    return jnp.concatenate(residuals)
+
+
+# --- Models ---
 
 
 @register_pytree_node_class
@@ -132,6 +175,79 @@ class MFNetJax:
                     val = func.run(xinput, cat_input)
                 evals[node] = val
         return tuple(evals[n] for n in target_nodes)
+
+    def fit(
+        self,
+        train_data: list[tuple[jnp.ndarray, jnp.ndarray]],
+        n_iters: int = 10000,
+        learning_rate: float = 1e-3,
+        loss_fn: Callable = mse_loss_graph,
+        verbose: bool = True,
+    ) -> Self:
+        """Train the network parameters using an Adam optimizer.
+
+        Args:
+            train_data: A list of (x, y) tuples for each model fidelity. The
+                order must match the topological sort order of the graph.
+            n_iters: The number of optimization iterations.
+            learning_rate: The learning rate for the Adam optimizer.
+            loss_fn: The loss function to use for training.
+            verbose: If True, display a progress bar.
+
+        Returns
+        -------
+            The trained MFNetJax instance.
+        """
+        # 1. Prepare data and identify target nodes for the loss function
+        target_nodes = tuple(
+            self.eval_order[i]
+            for i, data in enumerate(train_data)
+            if data is not None
+        )
+        valid_data = [data for data in train_data if data is not None]
+        x_data = [d[0] for d in valid_data]
+        y_data = [d[1] for d in valid_data]
+
+        # 2. Initialize the optimizer
+        optimizer = optax.adam(learning_rate)
+        opt_state = optimizer.init(self)
+
+        # 3. Define the JIT-compiled training step
+        @jax.jit
+        def train_step(
+            model: "MFNetJax",
+            opt_state: OptState,
+            x_list: list[jnp.ndarray],
+            y_list: list[jnp.ndarray],
+        ) -> tuple["MFNetJax", OptState, jnp.ndarray]:
+            loss, grads = jax.value_and_grad(loss_fn)(
+                model, target_nodes, x_list, y_list
+            )
+            updates, new_opt_state = optimizer.update(grads, opt_state, model)
+            new_model = optax.apply_updates(model, updates)
+            return new_model, new_opt_state, loss
+
+        # 4. Run the training loop
+        model = self
+        if not verbose:
+            for _ in range(n_iters):
+                model, opt_state, _ = train_step(
+                    model, opt_state, x_data, y_data
+                )
+        else:
+            pbar = trange(n_iters, desc="Training Loss", ascii=True)
+            for i in pbar:
+                model, opt_state, loss_val = train_step(
+                    model, opt_state, x_data, y_data
+                )
+                if i % 100 == 0:
+                    pbar.set_postfix(loss=f"{loss_val:.4e}")
+
+        # 5. Update the original object's parameters with the trained ones
+        for node in self.eval_order:
+            self.graph.nodes[node]["func"] = model.graph.nodes[node]["func"]
+
+        return self
 
 
 # --- Model Definitions ---
@@ -520,41 +636,6 @@ class PCEScaleShiftModel(Model):
         node_val = self.node_model.run(xin)
         correction = jnp.einsum("sop,sp->so", edge_val, parent_val)
         return correction + node_val
-
-
-# --- Loss Functions ---
-
-
-@partial(jax.jit, static_argnums=(1,))
-def mse_loss_graph(
-    model: MFNetJax,
-    nodes: tuple[Any, ...],
-    x: jnp.ndarray,
-    y: tuple[jnp.ndarray, ...],
-) -> jnp.ndarray:
-    """Calculate the total mean squared error across multiple graph nodes."""
-    pred_nodes = model.run(nodes, x)
-    losses = [
-        jnp.mean((pred - true) ** 2)
-        for pred, true in zip(pred_nodes, y, strict=False)
-    ]
-    return jnp.sum(jnp.array(losses))
-
-
-@partial(jax.jit, static_argnums=(1,))
-def resid_loss_graph(
-    model: MFNetJax,
-    nodes: tuple[Any, ...],
-    x: jnp.ndarray,
-    y: tuple[jnp.ndarray, ...],
-) -> jnp.ndarray:
-    """Calculate the flattened residual vector for least-squares solvers."""
-    pred_nodes = model.run(nodes, x)
-    residuals = [
-        (pred - true).ravel()
-        for pred, true in zip(pred_nodes, y, strict=False)
-    ]
-    return jnp.concatenate(residuals)
 
 
 # --- Initializer Functions ---

@@ -4,18 +4,15 @@ import inspect
 import time
 from collections.abc import Callable
 from pathlib import Path
-from typing import Annotated, Any, cast
+from typing import Annotated, Any
 
 import jax
 import jax.numpy as jnp
 import networkx as nx
 import numpy as np
-import optax
 import typer
 import yaml
-from jax import tree_util
 from rich.console import Console
-from rich.progress import track
 from rich.table import Table
 
 from mfnets_surrogates import net_jax
@@ -151,12 +148,13 @@ def _train_network(
     training_params: TrainingParams,
     config: Config,
 ) -> net_jax.MFNetJax:
-    """Run the training loop."""
+    """Run the training loop using the high-level .fit() method."""
     console.print(
         f"\nStarting training with {training_params.num_steps} steps..."
     )
     start_time = time.time()
 
+    # 1. Find the training dataset configuration
     dataset_config = next(
         (d for d in config.datasets if d.type == "training"), None
     )
@@ -166,62 +164,38 @@ def _train_network(
         )
         raise typer.Exit(code=1)
 
+    # 2. Prepare training data in the format required by .fit():
+    # A list of (x_i, y_i) tuples, one for each node.
     data_file = training_data[dataset_config.name]
     target_nodes = tuple(sorted(dataset_config.nodes))
-
+    train_data_for_fit = []
+    console.print("Preparing training data for the following nodes:")
     try:
-        x_train = data_file[f"x_train_{target_nodes[0]}"]
-        y_train_tuple = tuple(data_file[f"y_train_{n}"] for n in target_nodes)
+        for node_id in target_nodes:
+            x_train = data_file[f"x_train_{node_id}"]
+            y_train = data_file[f"y_train_{node_id}"]
+            train_data_for_fit.append((x_train, y_train))
+            console.print(
+                f"  - Node {node_id}: x_shape={x_train.shape}, "
+                f"y_shape={y_train.shape}"
+            )
     except KeyError as e:
         console.print(f"[bold red]Data key not found in NPZ file: {e}[/]")
         raise typer.Exit(code=1) from e
 
-    console.print(f"Training on nodes: [bold cyan]{target_nodes}[/]")
-    console.print(f"Input data shape: {x_train.shape}")
-    for i, y_arr in enumerate(y_train_tuple):
-        console.print(
-            f"  - Target data shape for node {target_nodes[i]}: {y_arr.shape}"
-        )
+    # 3. Call the high-level .fit() method
+    mfnet.fit(
+        train_data=train_data_for_fit,
+        n_iters=training_params.num_steps,
+        learning_rate=training_params.learning_rate,
+        verbose=True,  # Use the fit method's internal progress bar
+    )
 
-    params, treedef = tree_util.tree_flatten(mfnet)
-    assert isinstance(treedef, tree_util.PyTreeDef)
-
-    optimizer = optax.adam(learning_rate=training_params.learning_rate)
-    opt_state = optimizer.init(params)
-
-    def loss_fn(
-        p: list[Any], x: jnp.ndarray, y: tuple[jnp.ndarray, ...]
-    ) -> jnp.ndarray:
-        model = cast(net_jax.MFNetJax, treedef.unflatten(p))
-        # Cast the return value to reassure mypy about the JIT-wrapped function
-        return cast(
-            jnp.ndarray,
-            net_jax.mse_loss_graph(model, nodes=target_nodes, x=x, y=y),
-        )
-
-    @jax.jit
-    def step(
-        p: list[Any], opt_s: Any, x: jnp.ndarray, y: tuple[jnp.ndarray, ...]
-    ) -> tuple[list[Any], Any, jnp.ndarray]:
-        loss_val, grads = jax.value_and_grad(loss_fn)(p, x, y)
-        updates, opt_s = optimizer.update(grads, opt_s)
-        p = optax.apply_updates(p, updates)
-        return p, opt_s, loss_val
-
-    initial_loss = loss_fn(params, x_train, y_train_tuple)
-    console.print(f"Initial Loss: [bold yellow]{initial_loss:.6f}[/]")
-
-    for _ in track(
-        range(training_params.num_steps), description="Training..."
-    ):
-        params, opt_state, _ = step(params, opt_state, x_train, y_train_tuple)
-
-    final_loss = loss_fn(params, x_train, y_train_tuple)
     duration = time.time() - start_time
-    console.print(f"Final Loss:   [bold green]{final_loss:.6f}[/]")
     console.print(f"Training completed in {duration:.2f} seconds.")
 
-    return cast(net_jax.MFNetJax, treedef.unflatten(params))
+    # The mfnet object is trained in-place
+    return mfnet
 
 
 def _process_prediction_tasks(mfnet: net_jax.MFNetJax, config: Config) -> None:

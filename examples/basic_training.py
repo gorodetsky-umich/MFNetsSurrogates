@@ -74,13 +74,13 @@ def run_example():
 
     # --- 4. Train the Model ---
     print("\nStarting model training...")
-    initial_mse = mse_loss_graph(mfnet_to_train, (1, 2), x_train, y_train)
+    initial_mse = mse_loss_graph(mfnet_to_train, (1, 2), [x_train, x_train], y_train)
     print(f"Initial MSE: {initial_mse:.6f}")
 
     # Use a least-squares solver like Gauss-Newton, which is often efficient
     # for problems of this nature. It uses the residual function.
     solver = jaxopt.GaussNewton(
-        residual_fun=lambda m, x, y: resid_loss_graph(m, (1, 2), x, y),
+        residual_fun=lambda m, x, y: resid_loss_graph(m, (1, 2), [x, x], y),
         maxiter=50,
         tol=1e-6,
     )
@@ -91,7 +91,7 @@ def run_example():
     mfnet_fitted = res.params
 
     # --- 5. Evaluate the Fitted Model ---
-    final_mse = mse_loss_graph(mfnet_fitted, (1, 2), x_train, y_train)
+    final_mse = mse_loss_graph(mfnet_fitted, (1, 2), [x_train, x_train], y_train)
     print(f"Final MSE:   {final_mse:.6f}")
     print("\nTraining complete.")
 

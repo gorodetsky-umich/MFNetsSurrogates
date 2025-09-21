@@ -85,37 +85,36 @@ def plot_predictions_on_ax(ax, y_true, y_pred, mse: float, title: str):
 
 # --- Training and Model Creation ---
 
-
-def train_graph(mfnet: MFNetJax, x_train, y_train, num_steps=5000):
+def train_graph(mfnet: MFNetJax, x_train_list, y_train, num_steps=5000):
     """Run the Optax training loop for a given graph."""
     target_nodes = tuple(sorted(mfnet.graph.nodes))
     params, treedef = tree_util.tree_flatten(mfnet)
     optimizer = optax.adam(learning_rate=1e-3)
     opt_state = optimizer.init(params)
 
-    def _calculate_loss(current_params, x, y):
+    def _calculate_loss(current_params, x_list, y):
         model = treedef.unflatten(current_params)
-        return mse_loss_graph(model, target_nodes, x, y)
+        return mse_loss_graph(model, target_nodes, x_list, y)
 
     @jax.jit
-    def step(p, opt_s, x, y):
-        loss_val, grads = jax.value_and_grad(_calculate_loss)(p, x, y)
+    def step(p, opt_s, x_list, y):
+        loss_val, grads = jax.value_and_grad(_calculate_loss)(p, x_list, y)
         updates, opt_s = optimizer.update(grads, opt_s)
         p = optax.apply_updates(p, updates)
         return p, opt_s, loss_val
 
-    initial_loss = _calculate_loss(params, x_train, y_train)
+    initial_loss = _calculate_loss(params, x_train_list, y_train)
     print(f"  Initial MSE Loss: {initial_loss:.6f}")
     for i in range(num_steps):
-        params, opt_state, loss = step(params, opt_state, x_train, y_train)
+        params, opt_state, loss = step(params, opt_state, x_train_list, y_train)
         if (i + 1) % 1000 == 0:
             print(f"    Step {i+1}, Loss: {loss:.6f}")
 
     mfnet_fitted = treedef.unflatten(params)
     final_loss = mse_loss_graph(
-        mfnet_fitted, target_nodes, x_train, y_train
+        mfnet_fitted, target_nodes, x_train_list, y_train
     )
-    print(f"  Final MSE Loss:   {final_loss:.6f}")
+    print(f"  Final MSE Loss:    {final_loss:.6f}")
     return mfnet_fitted
 
 
@@ -249,7 +248,9 @@ def main():
             config["builder"](d_in, d_out, jax.nn.tanh),
             subkey,
         )
-        trained_model = train_graph(model, x_train, y_train)
+        
+        x_train_list = [x_train] * len(y_train)
+        trained_model = train_graph(model, x_train_list, y_train)
 
         y_pred = trained_model.run((4,), x_test)[0]
         mse = jnp.mean((y_true_hf - y_pred) ** 2)

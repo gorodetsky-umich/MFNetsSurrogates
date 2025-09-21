@@ -34,6 +34,7 @@ dependencies = [
     "networkx",
     "jax",
     "optax",
+    "tqdm",
     "typing_extensions>=4.0; python_version<'3.11'",
 ]
 
@@ -47,6 +48,7 @@ test = [
     "pytest",
     "scipy-stubs",
     "types-PyYAML",
+    "types-tqdm",
 ]
 docs = [
     "mkdocs-material",
@@ -120,7 +122,8 @@ module = [
     'matplotlib',
     'matplotlib.pyplot',
     'pydantic',
-    'optax'
+    'optax',
+    'tqdm',
 ]
 ignore_missing_imports = true
 

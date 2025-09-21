@@ -78,29 +78,30 @@ def plot_predictions_on_ax(ax, y_true, y_pred, mse: float, title: str):
     ax.grid(True, linestyle="--", alpha=0.6)
     ax.set_aspect("equal", adjustable="box")
 
-def train_graph(mfnet: MFNetJax, x_train, y_train, num_steps=15000):
+def train_graph(mfnet: MFNetJax, x_train_list, y_train, num_steps=15000):
     """A helper function to run the Optax training loop for a given graph."""
     target_nodes = tuple(sorted(mfnet.graph.nodes))
     params, treedef = tree_util.tree_flatten(mfnet)
     optimizer = optax.adam(learning_rate=5e-3)
     opt_state = optimizer.init(params)
 
-    def _calculate_loss(current_params, x, y):
+    def _calculate_loss(current_params, x_list, y):
         """Helper for loss calculation, compatible with jax.grad."""
         model = treedef.unflatten(current_params)
-        return mse_loss_graph(model, target_nodes, x, y)
+        return mse_loss_graph(model, target_nodes, x_list, y)
 
     @jax.jit
-    def step(p, opt_s, x, y):
-        grads = jax.grad(_calculate_loss)(p, x, y)
+    def step(p, opt_s, x_list, y):
+        # We don't need the loss value here, so use jax.grad directly
+        grads = jax.grad(_calculate_loss)(p, x_list, y)
         updates, opt_s = optimizer.update(grads, opt_s)
         p = optax.apply_updates(p, updates)
         return p, opt_s
 
     for _ in range(num_steps):
-        params, opt_state = step(params, opt_state, x_train, y_train)
+        params, opt_state = step(params, opt_state, x_train_list, y_train)
 
-    return treedef.unflatten(params)
+    return treedef.unflatten(params)    
 
 
 def _create_peer_pce_graph(key, d_in, d_out, degree) -> MFNetJax:
@@ -185,7 +186,8 @@ def main():
             key, pce_key = jax.random.split(key)
             mfnet = builder_fn(pce_key, d_in, d_out, degree)
 
-            mfnet_trained = train_graph(mfnet, x_train, y_train)
+            x_train_list = [x_train] * len(y_train)
+            mfnet_trained = train_graph(mfnet, x_train_list, y_train)
 
             (y_pred,) = mfnet_trained.run((3,), x_test)
             test_mse = jnp.mean((y_true_hf - y_pred) ** 2)

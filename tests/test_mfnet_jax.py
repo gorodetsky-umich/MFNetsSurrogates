@@ -167,6 +167,8 @@ def test_end_to_end_training_overfit_with_optax(key):
     x_train = jax.random.normal(data_key, (10, d_in))
     y_train = true_mfnet.run((1, 2), x_train)
 
+    x_train_list = [x_train, x_train]
+
     # 2. Create a randomly initialized model to be trained
     train_model1 = LinearModel(init_linear_params(train_key, d_in, d1_out))
     train_model2 = init_linear_scale_shift_model(
@@ -183,11 +185,11 @@ def test_end_to_end_training_overfit_with_optax(key):
     opt_state = optimizer.init(initial_params)
 
     # 5. Define a loss function that takes the raw parameters
-    def loss_fn(current_params, x, y):
+    def loss_fn(current_params, x_list, y):
         model = treedef.unflatten(current_params)
-        return mse_loss_graph(model, nodes=(1, 2), x=x, y=y)
+        return mse_loss_graph(model, nodes=(1, 2), x_list=x_list, y_list=y)
 
-    initial_loss = loss_fn(initial_params, x_train, y_train)
+    initial_loss = loss_fn(initial_params, x_train_list, y_train)
 
     # 6. Define a JIT-compiled training step
     @jax.jit
@@ -199,11 +201,11 @@ def test_end_to_end_training_overfit_with_optax(key):
 
     # 7. Run the explicit training loop
     for _ in range(5000):
-        params, opt_state = step(params, opt_state, x_train, y_train)
+        params, opt_state = step(params, opt_state, x_train_list, y_train)
 
     # 8. Reconstruct the final fitted model and calculate final loss
     mfnet_fitted = treedef.unflatten(params)
-    final_loss = mse_loss_graph(mfnet_fitted, (1, 2), x_train, y_train)
+    final_loss = mse_loss_graph(mfnet_fitted, (1, 2), x_train_list, y_train)
 
     # 9. Assert that the final loss is significantly smaller than the initial
     assert final_loss < initial_loss / 100
@@ -347,3 +349,50 @@ def test_pce_scale_shift_model_pytree_roundtrip(key):
     rebuilt_output = rebuilt_model.run(x_test, parent_val)
 
     assert jnp.allclose(original_output, rebuilt_output)
+
+
+def test_mfnet_fit_method_overfits(key):
+    """Check if the new MFNetJax.fit() method can overfit a small dataset."""
+    d_in, d1_out, d2_out = 2, 2, 3
+    true_key, train_key, data_key = jax.random.split(key, 3)
+
+    # 1. Generate a small, noiseless dataset from a "true" model
+    true_model1 = LinearModel(init_linear_params(true_key, d_in, d1_out))
+    true_model2 = init_linear_scale_shift_model(true_key, d_in, d1_out, d2_out)
+    true_mfnet = MFNetJax(make_graph_2gen(true_model1, true_model2))
+    x_train = jax.random.normal(data_key, (10, d_in))
+    y_train_tuple = true_mfnet.run((1, 2), x_train)
+
+    # The fit method expects a list of (x, y) tuples. For this graph,
+    # both models are trained on the same input data.
+    train_data = [
+        (x_train, y_train_tuple[0]),
+        (x_train, y_train_tuple[1]),
+    ]
+
+    # 2. Create a randomly initialized model to be trained
+    train_model1 = LinearModel(init_linear_params(train_key, d_in, d1_out))
+    train_model2 = init_linear_scale_shift_model(
+        train_key, d_in, d1_out, d2_out
+    )
+    mfnet_to_train = MFNetJax(make_graph_2gen(train_model1, train_model2))
+
+    # 3. Calculate initial loss before training
+    x_train_list = [x_train, x_train]
+    initial_loss = mse_loss_graph(
+        mfnet_to_train, (1, 2), x_train_list, y_train_tuple
+    )
+
+    # 4. Call the new fit method to train the model
+    mfnet_to_train.fit(
+        train_data, n_iters=5000, learning_rate=5e-3, verbose=False
+    )
+
+    # 5. Calculate final loss after training
+    final_loss = mse_loss_graph(
+        mfnet_to_train, (1, 2), x_train_list, y_train_tuple
+    )
+
+    # 6. Assert that the final loss is significantly smaller
+    assert final_loss < initial_loss / 100
+    assert final_loss < 1e-4
