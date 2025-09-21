@@ -560,13 +560,11 @@ def resid_loss_graph(
 # --- Initializer Functions ---
 
 
-def init_linear_params(
-    key: jax.Array, dim_in: int, dim_out: int
-) -> LinearParams:
+def init_linear_params(key: jax.Array, d_in: int, d_out: int) -> LinearParams:
     """Initialize parameters for a LinearModel."""
     w_key, b_key = jax.random.split(key)
-    weight = jax.random.normal(w_key, (dim_out, dim_in))
-    bias = jax.random.normal(b_key, (dim_out,))
+    weight = jax.random.normal(w_key, (d_out, d_in))
+    bias = jax.random.normal(b_key, (d_out,))
     return LinearParams(weight, bias)
 
 
@@ -617,15 +615,15 @@ def init_mlp_enhancement_model(
 
 def init_pce_model(
     key: jax.Array,
-    dim_in: int,
-    dim_out: int,
+    d_in: int,
+    d_out: int,
     degree: int,
     poly_type: str = "hermite",
 ) -> PCEModel:
     """Initialize a PCEModel."""
-    multi_indices = _compute_multi_indices(dim_in, degree)
+    multi_indices = _compute_multi_indices(d_in, degree)
     num_basis_terms = multi_indices.shape[0]
-    pce_coeffs = init_linear_params(key, num_basis_terms, dim_out)
+    pce_coeffs = init_linear_params(key, num_basis_terms, d_out)
     return PCEModel(pce_coeffs, poly_type, degree, jnp.asarray(multi_indices))
 
 

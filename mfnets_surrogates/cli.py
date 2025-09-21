@@ -1,9 +1,10 @@
 """The command-line interface for MFNets-Surrogates."""
+
 import inspect
-import os
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Annotated, Any, cast
 
 import jax
 import jax.numpy as jnp
@@ -20,15 +21,13 @@ from rich.table import Table
 from mfnets_surrogates import net_jax
 from mfnets_surrogates.config import Config, TrainingParams
 
-app = typer.Typer(
-    pretty_exceptions_show_locals=False
-)
+app = typer.Typer(pretty_exceptions_show_locals=False)
 console = Console()
 
 
 def _discover_initializers() -> dict[str, Callable[..., Any]]:
     """Scan the net_jax module to find all model initializer functions."""
-    initializers = {}
+    initializers: dict[str, Callable[..., Any]] = {}
     for name, func in inspect.getmembers(net_jax, inspect.isfunction):
         if name.startswith("init_"):
             model_name = name.replace("init_", "").replace("_", " ").title()
@@ -49,12 +48,12 @@ def _load_and_validate_config(config_path: Path) -> Config:
     """Load and validate the YAML config file using Pydantic."""
     console.print(f"Loading configuration from: [bold cyan]{config_path}[/]")
     try:
-        with open(config_path, "r") as f:
+        with open(config_path) as f:
             raw_config = yaml.safe_load(f)
         return Config(**raw_config)
     except Exception as e:
         console.print(f"[bold red]Error parsing configuration file:[/]\n{e}")
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
 
 
 def _load_training_data(
@@ -85,7 +84,8 @@ def _load_training_data(
             d_out = data[y_key].shape[1]
             dim_info[node_id] = (d_in, d_out)
     console.print(
-        f"Derived model dimensions from data for nodes: {list(dim_info.keys())}"
+        "Derived model dimensions from data for nodes: "
+        f"{list(dim_info.keys())}"
     )
     return all_data, dim_info
 
@@ -104,7 +104,6 @@ def _build_mfnet_from_config(
         key, model_key = jax.random.split(key)
         d_in, d_out = dim_info[node_id]
 
-        # Perform a case-insensitive lookup for the initializer
         initializer = next(
             (
                 func
@@ -113,21 +112,17 @@ def _build_mfnet_from_config(
             ),
             None,
         )
-
         if initializer is None:
-            console.print(f"[bold red]Unknown model type: {model_config.type}[/]")
+            console.print(
+                f"[bold red]Unknown model type: {model_config.type}[/]"
+            )
             raise typer.Exit(code=1)
 
         init_kwargs = model_config.params.copy()
+        init_kwargs["d_in"] = d_in
+        init_kwargs["d_out"] = d_out
 
-        if "pce" in model_config.type.lower():
-            init_kwargs["dim_in"] = d_in
-            init_kwargs["dim_out"] = d_out
-        else:
-            init_kwargs["d_in"] = d_in
-            init_kwargs["d_out"] = d_out
-
-        predecessors = sorted(list(graph.predecessors(node_id)))
+        predecessors = sorted(graph.predecessors(node_id))
         if predecessors:
             d_parent = sum(dim_info[p][1] for p in predecessors)
             if "scaleshift" in model_config.type.lower():
@@ -166,7 +161,9 @@ def _train_network(
         (d for d in config.datasets if d.type == "training"), None
     )
     if not dataset_config:
-        console.print("[bold red]Critical error: No training dataset found.[/]")
+        console.print(
+            "[bold red]Critical error: No training dataset found.[/]"
+        )
         raise typer.Exit(code=1)
 
     data_file = training_data[dataset_config.name]
@@ -177,7 +174,7 @@ def _train_network(
         y_train_tuple = tuple(data_file[f"y_train_{n}"] for n in target_nodes)
     except KeyError as e:
         console.print(f"[bold red]Data key not found in NPZ file: {e}[/]")
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
 
     console.print(f"Training on nodes: [bold cyan]{target_nodes}[/]")
     console.print(f"Input data shape: {x_train.shape}")
@@ -187,14 +184,20 @@ def _train_network(
         )
 
     params, treedef = tree_util.tree_flatten(mfnet)
+    assert isinstance(treedef, tree_util.PyTreeDef)
+
     optimizer = optax.adam(learning_rate=training_params.learning_rate)
     opt_state = optimizer.init(params)
 
     def loss_fn(
         p: list[Any], x: jnp.ndarray, y: tuple[jnp.ndarray, ...]
     ) -> jnp.ndarray:
-        model = treedef.unflatten(p)
-        return net_jax.mse_loss_graph(model, nodes=target_nodes, x=x, y=y)
+        model = cast(net_jax.MFNetJax, treedef.unflatten(p))
+        # Cast the return value to reassure mypy about the JIT-wrapped function
+        return cast(
+            jnp.ndarray,
+            net_jax.mse_loss_graph(model, nodes=target_nodes, x=x, y=y),
+        )
 
     @jax.jit
     def step(
@@ -208,7 +211,9 @@ def _train_network(
     initial_loss = loss_fn(params, x_train, y_train_tuple)
     console.print(f"Initial Loss: [bold yellow]{initial_loss:.6f}[/]")
 
-    for _ in track(range(training_params.num_steps), description="Training..."):
+    for _ in track(
+        range(training_params.num_steps), description="Training..."
+    ):
         params, opt_state, _ = step(params, opt_state, x_train, y_train_tuple)
 
     final_loss = loss_fn(params, x_train, y_train_tuple)
@@ -216,20 +221,26 @@ def _train_network(
     console.print(f"Final Loss:   [bold green]{final_loss:.6f}[/]")
     console.print(f"Training completed in {duration:.2f} seconds.")
 
-    return treedef.unflatten(params)
+    return cast(net_jax.MFNetJax, treedef.unflatten(params))
 
 
 def _process_prediction_tasks(mfnet: net_jax.MFNetJax, config: Config) -> None:
     """Run and save all prediction tasks specified in the config."""
     console.print("\nProcessing prediction tasks...")
-    prediction_datasets = [d for d in config.datasets if d.type == "prediction"]
+    prediction_datasets = [
+        d for d in config.datasets if d.type == "prediction"
+    ]
 
     if not prediction_datasets:
-        console.print("[yellow]No prediction tasks found in configuration.[/yellow]")
+        console.print(
+            "[yellow]No prediction tasks found in configuration.[/yellow]"
+        )
         return
 
     for task in prediction_datasets:
-        console.print(f"--- Running prediction task: [bold cyan]{task.name}[/bold cyan] ---")
+        console.print(
+            f"- Running prediction task: [bold cyan]{task.name}[/bold cyan] -"
+        )
         try:
             input_data = np.load(task.data_path)
             x_predict = input_data["x_predict"]
@@ -238,12 +249,14 @@ def _process_prediction_tasks(mfnet: net_jax.MFNetJax, config: Config) -> None:
                 f"with shape {x_predict.shape}"
             )
         except Exception as e:
-            console.print(f"[bold red]Error loading data for task '{task.name}': {e}[/]")
+            console.print(
+                f"[bold red]Error loading data for task '{task.name}': {e}[/]"
+            )
             continue
 
         if len(task.nodes) != 1:
             console.print(
-                f"[bold red]Prediction tasks must specify exactly one target "
+                "[bold red]Prediction tasks must specify exactly one target "
                 f"node. Task '{task.name}' has {len(task.nodes)}.[/]"
             )
             continue
@@ -257,11 +270,15 @@ def _process_prediction_tasks(mfnet: net_jax.MFNetJax, config: Config) -> None:
             output_path = Path(task.output_path)
             output_path.parent.mkdir(parents=True, exist_ok=True)
             np.savez(output_path, y_predict=y_predict, x_predict=x_predict)
-            console.print(f"[green]Successfully saved predictions to '{output_path}'[/green]")
+            console.print(
+                f"[green]Success. saving pred. to '{output_path}'[/green]"
+            )
         else:
             console.print(
-                f"[yellow]No output_path for task '{task.name}'. Skipping save.[/yellow]"
+                f"[yellow]No output_path for task '{task.name}'. "
+                "Skipping save.[/yellow]"
             )
+
 
 @app.command()
 def list_models() -> None:
@@ -276,7 +293,7 @@ def list_models() -> None:
         params = [
             p
             for p in sig.parameters
-            if p not in ["key", "d_in", "d_out", "dim_in", "dim_out", "d_parent"]
+            if p not in ["key", "d_in", "d_out", "d_parent"]
         ]
         table.add_row(name, ", ".join(params))
 
@@ -285,29 +302,30 @@ def list_models() -> None:
 
 @app.command()
 def run(
-    config_path: Path = typer.Option(
-        ...,
-        "--config",
-        "-c",
-        help="Path to the YAML configuration file.",
-        exists=True,
-        file_okay=True,
-        dir_okay=False,
-        readable=True,
-        resolve_path=True,
-    )
+    config_path: Annotated[
+        Path,
+        typer.Option(
+            "--config",
+            "-c",
+            help="Path to the YAML configuration file.",
+            exists=True,
+            file_okay=True,
+            dir_okay=False,
+            readable=True,
+            resolve_path=True,
+        ),
+    ],
 ) -> None:
-    """
-    Build, train, and run predictions for an MFNets surrogate model.
-    """
+    """Build, train, and run predictions for an MFNets surrogate model."""
     config = _load_and_validate_config(config_path)
     training_data, dim_info = _load_training_data(config)
     mfnet = _build_mfnet_from_config(config, dim_info)
-    trained_mfnet = _train_network(mfnet, training_data, config.training, config)
+    trained_mfnet = _train_network(
+        mfnet, training_data, config.training, config
+    )
     _process_prediction_tasks(trained_mfnet, config)
     console.print("\n[bold green]CLI tool finished successfully.[/]")
 
 
 if __name__ == "__main__":
     app()
-

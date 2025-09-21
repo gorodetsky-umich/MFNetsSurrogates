@@ -1,4 +1,5 @@
 """Pydantic models for the CLI configuration file."""
+
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field

@@ -38,11 +38,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-torch = [
-    "torch",
-    "pyro-ppl",
-]
-# CLI dependencies are now in a dedicated group
 cli = [
     "typer[all]",
     "pydantic",
@@ -51,17 +46,19 @@ cli = [
 test = [
     "pytest",
     "scipy-stubs",
+    "types-PyYAML",
 ]
 docs = [
     "mkdocs-material",
     "mkdocstrings[python]",
 ]
 dev = [
-    "mfnets-surrogates[test,torch,cli,docs]", # Add 'cli' to dev
+    "mfnets-surrogates[test,cli,docs]",
     "ruff",
     "mypy",
 ]
-all = ["mfnets-surrogates[dev,torch,cli]"]
+all = ["mfnets-surrogates[dev,cli]"]
+
 
 [project.urls]
 Homepage = "https://github.com/gorodetsky-umich/MFNetsSurrogates"
@@ -69,14 +66,12 @@ Documentation = "https://gorodetsky-umich.github.io/MFNetsSurrogates/"
 Issues = "https://github.com/gorodetsky-umich/MFNetsSurrogates/issues"
 Source = "https://github.com/gorodetsky-umich/MFNetsSurrogates"
 
-# This section creates the 'mfnets-run' command
 [project.scripts]
 mfnets-run = "mfnets_surrogates.cli:app"
 
 [tool.setuptools]
 packages = ["mfnets_surrogates"]
 
-# ... (rest of the file is unchanged) ...
 [tool.ruff]
 include = ["mfnets_surrogates/**/*.py", "tests/**/*.py", "pyproject.toml"]
 exclude = [
@@ -92,7 +87,7 @@ target-version = "py310"
 
 [tool.ruff.lint]
 select = [
-    "F", "E", "W", "I", "B", "C4", "UP", "D",
+    "F", "E", "W", "I", "B", "C4", "UP", "D", "B008"
 ]
 ignore = [
     "D100", "D104", "D107",
@@ -124,7 +119,8 @@ module = [
     'h5py',
     'matplotlib',
     'matplotlib.pyplot',
-    'pydantic'
+    'pydantic',
+    'optax'
 ]
 ignore_missing_imports = true
 
