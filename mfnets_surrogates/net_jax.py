@@ -683,6 +683,30 @@ def init_mlp_params(key: jax.Array, layer_sizes: list[int]) -> MLPParams:
     return params
 
 
+def init_mlp_model(
+    key: jax.Array,
+    layer_sizes: list[int],
+    activation: Callable[[jnp.ndarray], jnp.ndarray] = jnn.relu,
+) -> MLPModel:
+    """Initialize a complete MLPModel.
+
+    This is a wrapper that creates the parameters and instantiates the
+    MLPModel class, making it discoverable by the app.
+
+    Args:
+        key: A JAX random key.
+        layer_sizes: A list defining the network structure,
+                      e.g., [d_in, hidden1, d_out].
+        activation: The activation function for hidden layers.
+
+    Returns
+    -------
+        An instance of MLPModel.
+    """
+    params = init_mlp_params(key, layer_sizes)
+    return MLPModel(params, activation=activation)
+
+
 def init_mlp_enhancement_model(
     key: jax.Array,
     layer_sizes: list[int],
