@@ -183,22 +183,24 @@ class MFNetJax:
         learning_rate: float = 1e-3,
         loss_fn: Callable = mse_loss_graph,
         verbose: bool = True,
+        log_every: int = 100,
+        history_callback: list | None = None,
     ) -> Self:
         """Train the network parameters using an Adam optimizer.
 
         Args:
-            train_data: A list of (x, y) tuples for each model fidelity. The
-                order must match the topological sort order of the graph.
+            train_data: A list of (x, y) tuples for each model fidelity.
             n_iters: The number of optimization iterations.
             learning_rate: The learning rate for the Adam optimizer.
             loss_fn: The loss function to use for training.
             verbose: If True, display a progress bar.
+            log_every: The interval at which to record the loss.
+            history_callback: An optional list to append loss values to.
 
         Returns
         -------
             The trained MFNetJax instance.
         """
-        # 1. Prepare data and identify target nodes for the loss function
         target_nodes = tuple(
             self.eval_order[i]
             for i, data in enumerate(train_data)
@@ -207,12 +209,9 @@ class MFNetJax:
         valid_data = [data for data in train_data if data is not None]
         x_data = [d[0] for d in valid_data]
         y_data = [d[1] for d in valid_data]
-
-        # 2. Initialize the optimizer
         optimizer = optax.adam(learning_rate)
         opt_state = optimizer.init(self)
 
-        # 3. Define the JIT-compiled training step
         @jax.jit
         def train_step(
             model: "MFNetJax",
@@ -227,23 +226,27 @@ class MFNetJax:
             new_model = optax.apply_updates(model, updates)
             return new_model, new_opt_state, loss
 
-        # 4. Run the training loop
         model = self
-        if not verbose:
-            for _ in range(n_iters):
-                model, opt_state, _ = train_step(
-                    model, opt_state, x_data, y_data
-                )
-        else:
+
+        if verbose:
             pbar = trange(n_iters, desc="Training Loss", ascii=True)
             for i in pbar:
                 model, opt_state, loss_val = train_step(
                     model, opt_state, x_data, y_data
                 )
-                if i % 100 == 0:
+                if i % log_every == 0:
+                    if history_callback is not None:
+                        history_callback.append(loss_val)
                     pbar.set_postfix(loss=f"{loss_val:.4e}")
+        else:
+            for i in range(n_iters):
+                model, opt_state, loss_val = train_step(
+                    model, opt_state, x_data, y_data
+                )
+                if i % log_every == 0:
+                    if history_callback is not None:
+                        history_callback.append(loss_val)
 
-        # 5. Update the original object's parameters with the trained ones
         for node in self.eval_order:
             self.graph.nodes[node]["func"] = model.graph.nodes[node]["func"]
 
