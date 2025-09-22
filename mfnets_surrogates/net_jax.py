@@ -649,6 +649,25 @@ def init_linear_params(key: jax.Array, d_in: int, d_out: int) -> LinearParams:
     return LinearParams(weight, bias)
 
 
+def init_linear_model(key: jax.Array, d_in: int, d_out: int) -> LinearModel:
+    """Initialize a complete LinearModel.
+
+    This function creates the parameters and instantiates the LinearModel
+    class, making it discoverable by the application.
+
+    Args:
+        key: A JAX random key.
+        d_in: The dimension of the input features.
+        d_out: The dimension of the output features.
+
+    Returns
+    -------
+        An instance of LinearModel.
+    """
+    params = init_linear_params(key, d_in, d_out)
+    return LinearModel(params)
+
+
 def init_linear2d_params(
     key: jax.Array, d_out1: int, d_out2: int, d_in: int
 ) -> LinearParams:

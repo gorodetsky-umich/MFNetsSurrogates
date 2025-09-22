@@ -21,6 +21,7 @@ from .net_jax import (
     PCEScaleShiftModel,
     build_poly_basis,
     init_linear2d_params,
+    init_linear_model,
     # Initializer functions
     init_linear_params,
     init_linear_scale_shift_model,
@@ -56,6 +57,7 @@ __all__ = [
     "mse_loss_graph",
     "resid_loss_graph",
     "init_linear_params",
+    "init_linear_model",
     "init_linear2d_params",
     "init_linear_scale_shift_model",
     "init_mlp_params",
