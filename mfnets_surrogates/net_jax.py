@@ -369,7 +369,7 @@ class MLPModel(Model):
     def __init__(
         self,
         params: MLPParams,
-        activation: Callable[[jnp.ndarray], jnp.ndarray] = jnn.relu,
+        activation: Callable[[jnp.ndarray], jnp.ndarray] = jnn.gelu,
     ) -> None:
         """Initialize the MLP with its parameters and activation function."""
         self.params = params
@@ -708,7 +708,7 @@ def init_mlp_params(key: jax.Array, layer_sizes: list[int]) -> MLPParams:
 def init_mlp_model(
     key: jax.Array,
     layer_sizes: list[int],
-    activation: Callable[[jnp.ndarray], jnp.ndarray] = jnn.relu,
+    activation: Callable[[jnp.ndarray], jnp.ndarray] = jnn.gelu,
 ) -> MLPModel:
     """Initialize a complete MLPModel.
 
@@ -732,7 +732,7 @@ def init_mlp_model(
 def init_mlp_enhancement_model(
     key: jax.Array,
     layer_sizes: list[int],
-    activation: Callable[[jnp.ndarray], jnp.ndarray] = jnn.relu,
+    activation: Callable[[jnp.ndarray], jnp.ndarray] = jnn.gelu,
 ) -> MLPEnhancementModel:
     """Initialize a complete MLPEnhancementModel."""
     mlp_params = init_mlp_params(key, layer_sizes)
