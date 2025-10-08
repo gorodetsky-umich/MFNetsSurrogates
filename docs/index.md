@@ -11,5 +11,6 @@ This documentation provides a comprehensive guide to the library, including a tu
 -   **Flexible Graph Structures**: Uses NetworkX to define arbitrary directed acyclic graphs.
 -   **Composable Models**: Includes a suite of built-in models like `LinearModel`, `MLPModel`, and `PCEModel`.
 -   **Selective Parameter Freezing**: Freeze or unfreeze parameters of any node via the `optimizable` flag; see [Selective Parameter Freezing](optimizable.md).
+-   **AutoMFNet Two-Stage Pipeline**: Automatically discover graph structure and then train high-fidelity models; see [AutoMFNet Two-Stage Pipeline](auto_structure.md).
 
 To get started, check out the **Tutorial**.

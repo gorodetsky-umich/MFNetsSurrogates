@@ -23,6 +23,7 @@ nav:
   - 'Tutorial': 'tutorial.md'
   - 'API Reference': 'api.md'
   - 'Selective Parameter Freezing': 'optimizable.md'
+  - 'AutoMFNet Two-Stage Pipeline': 'auto_structure.md'
   - 'Command Line Tool': 'cli.md'
 
 plugins:
