@@ -89,8 +89,9 @@ class MFNetStructureLearner:
 
     def run(self, x_input: jnp.ndarray) -> jnp.ndarray:
         """
-        Forward pass: solve (I - W^T) F = Δ where each scalar W_ij is
-        applied to every coordinate of δ_i(x).
+        Forward pass: solve (I - W^T) F = Δ.
+
+        Each scalar W_ij is applied to every coordinate of δ_i(x).
         """
         # Shortcut for single node: just return its raw output
         if self.n_nodes == 1:
