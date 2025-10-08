@@ -10,5 +10,6 @@ This documentation provides a comprehensive guide to the library, including a tu
 -   **End-to-End Differentiable**: The `MFNetJax` class is registered as a JAX PyTree, making the graph structure transparent to JAX's transformations.
 -   **Flexible Graph Structures**: Uses NetworkX to define arbitrary directed acyclic graphs.
 -   **Composable Models**: Includes a suite of built-in models like `LinearModel`, `MLPModel`, and `PCEModel`.
+-   **Selective Parameter Freezing**: Freeze or unfreeze parameters of any node via the `optimizable` flag; see [Selective Parameter Freezing](optimizable.md).
 
 To get started, check out the **Tutorial**.

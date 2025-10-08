@@ -18,6 +18,7 @@ The library is built on JAX to enable execution on hardware accelerators like GP
 * **Flexible Graph Structures**: Uses NetworkX to define arbitrary directed acyclic graphs, giving control over the model architecture.  
 * **Composable Models**: Includes a suite of built-in models that can be used as nodes in the graph, including LinearModel, MLPModel, and PCEModel (Polynomial Chaos Expansion).  
 * **Modern Tooling**: Uses Optax for optimization, Ruff for linting and formatting, and Pytest for testing.
+* **Selective Parameter Freezing**: Expose an `optimizable` flag on each model node so you can freeze or unfreeze parameters during training for fine-grained control.
 
 ## **Installation**
 
