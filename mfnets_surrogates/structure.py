@@ -12,10 +12,7 @@ from mfnets_surrogates.net_jax import Model
 
 @register_pytree_node_class
 class MFNetStructureLearner:
-    """
-    Learns both the adjacency matrix W and base model parameters for a
-    fully-connected graph, discovering a sparse DAG structure.
-    """
+    """Learns both the adjacency matrix W and base model parameters for a fully-connected graph, discovering a sparse DAG structure."""
 
     def __init__(
         self,
@@ -44,9 +41,7 @@ class MFNetStructureLearner:
         self.beta = beta
 
     def tree_flatten(self) -> tuple[list[jnp.ndarray], tuple]:
-        """
-        Flatten parameters (W and base_models) for JAX transformations.
-        """
+        """Flatten parameters (W and base_models) for JAX transformations."""
         leaves: list[jnp.ndarray] = [self.adjacency_matrix]
         treedefs = []
 
@@ -68,9 +63,7 @@ class MFNetStructureLearner:
     def tree_unflatten(
         cls, aux_data: tuple, children: list[jnp.ndarray]
     ) -> "MFNetStructureLearner":
-        """
-        Reconstruct instance from leaves and static data.
-        """
+        """Reconstruct instance from leaves and static data."""
         n_nodes, constraint_mask, treedefs, alpha, beta = aux_data
         # First child is adjacency_matrix
         adj_matrix = children[0]
@@ -92,9 +85,7 @@ class MFNetStructureLearner:
         return inst
 
     def run(self, x_input: jnp.ndarray) -> jnp.ndarray:
-        """
-        Forward pass: compute base outputs, form and solve (I - W^T) F = Δ.
-        """
+        """Forward pass: compute base outputs, form and solve (I - W^T) F = Δ."""
         W = self.adjacency_matrix * self.constraint_mask
         # Compute Δ for each node
         delta = jnp.stack([m.run(x_input) for m in self.base_models], axis=0)
@@ -110,9 +101,7 @@ class MFNetStructureLearner:
         y_targets: jnp.ndarray,
         supervised_idx: jnp.ndarray,
     ) -> jnp.ndarray:
-        """
-        Loss combining data fit, acyclicity, and sparsity penalties.
-        """
+        """Loss combining data fit, acyclicity, and sparsity penalties."""
         F = self.run(x_input)
         # Data-fit: only supervised nodes
         y_pred = F[supervised_idx]
