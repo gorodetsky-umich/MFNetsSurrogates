@@ -297,9 +297,10 @@ def main():
     dag_auto = auto.extract_dag(
         threshold=0.1,
         leaf_model_fn=lambda nid, dim: leaf_models[nid],
-        edge_model_fn=lambda nid, dim, pd: init_mlp_enhancement_model(
+        edge_model_fn=lambda nid, dim, pdims: init_mlp_enhancement_model(
             jax.random.split(key, 1)[0],
-            [d_in + pd[0], 32, dim],
+            [d_in + sum(pdims), 32, 32, dim],
+            jax.nn.tanh,
         ),
     )
     # Diagnostic: print discovered DAG edges
