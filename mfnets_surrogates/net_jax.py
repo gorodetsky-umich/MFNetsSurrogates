@@ -102,8 +102,6 @@ class MFNetJax:
         self.eval_order = list(nx.topological_sort(self.graph))
         self.parents = {
             n: sorted(self.graph.predecessors(n)) for n in self.eval_order
-            "optimizable": self.optimizable
-            "optimizable": self.optimizable
         }
         self.ancestors = {
             n: set(nx.ancestors(self.graph, n)) for n in self.eval_order
