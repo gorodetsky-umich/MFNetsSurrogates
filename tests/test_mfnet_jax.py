@@ -450,6 +450,7 @@ def test_optimizable_flag_effect(key):
             "Parameters should change when optimizable"
         )
 
+
 def test_three_node_subset_optimizable(key):
     """Nodes 1 and 2 fixed, only node 3 should learn."""
     import networkx as nx
@@ -508,17 +509,17 @@ def test_three_node_subset_optimizable(key):
     n3 = len(tree_leaves(m3))
 
     # 1) Node 1 leaves unchanged
-    for before, after in zip(init_leaves[:n1], post_leaves[:n1]):
+    for before, after in zip(init_leaves[:n1], post_leaves[:n1], strict=False):
         assert jnp.allclose(before, after), "Node1 params should remain fixed"
 
     # 2) Node 2 leaves unchanged
     for before, after in zip(
-        init_leaves[n1 : n1 + n2], post_leaves[n1 : n1 + n2]
+        init_leaves[n1 : n1 + n2], post_leaves[n1 : n1 + n2], strict=False
     ):
         assert jnp.allclose(before, after), "Node2 params should remain fixed"
 
     # 3) Node 3 leaves should change
     for before, after in zip(
-        init_leaves[n1 + n2 :], post_leaves[n1 + n2 :]
+        init_leaves[n1 + n2 :], post_leaves[n1 + n2 :], strict=False
     ):
         assert not jnp.allclose(before, after), "Node3 params should update"
