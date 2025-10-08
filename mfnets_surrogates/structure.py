@@ -232,19 +232,24 @@ class AutoMFNet:
 
     def __init__(
         self,
-        base_models: Sequence[Model],
-        leaf_model_fn: Callable[[Model], Model],
-        edge_model_fn: Callable[[Model, Sequence[Model]], Model],
         sink_node: int | None = None,
         alpha: float = 1.0,
         beta: float = 1.0,
     ):
-        self.base_models = list(base_models)
-        self.leaf_model_fn = leaf_model_fn
-        self.edge_model_fn = edge_model_fn
+        """
+        Args:
+            sink_node: index of node to freeze as sink (no outgoing edges).
+            alpha: weight for acyclicity penalty.
+            beta: weight for sparsity penalty.
+        """
         self.sink_node = sink_node
         self.alpha = alpha
         self.beta = beta
+
+        self.base_models: list[Model] | None = None
+        self.learner: MFNetStructureLearner | None = None
+        self.dag: nx.DiGraph | None = None
+        self.trained_mfnet: MFNetJax | None = None
 
         self.learner: MFNetStructureLearner | None = None
         self.dag: nx.DiGraph | None = None
@@ -252,11 +257,14 @@ class AutoMFNet:
 
     def fit_structure(
         self,
+        base_models: Sequence[Model],
         structure_data: list[tuple[jnp.ndarray, jnp.ndarray] | None],
         n_iters: int = 1000,
         learning_rate: float = 1e-3,
     ) -> MFNetStructureLearner:
         """Learn adjacency matrix W and base-model parameters."""
+        # Store the base_models for structure learning
+        self.base_models = list(base_models)
         # Choose sink_node: user-supplied or highest-fidelity supervised node
         if self.sink_node is None:
             sup_idxs = [
@@ -279,8 +287,14 @@ class AutoMFNet:
     def extract_dag(
         self,
         threshold: float,
+        leaf_model_fn: Callable[[Model], Model],
+        edge_model_fn: Callable[[Model, Sequence[Model]], Model],
     ) -> nx.DiGraph:
-        """Prune W at threshold and build a DAG with full models."""
+        """
+        Prune W at threshold and build a DAG with full models.
+        leaf_model_fn: factory for nodes without parents.
+        edge_model_fn: factory for nodes with parents.
+        """
         if self.learner is None:
             raise RuntimeError("You must call fit_structure(...) first.")
 
@@ -305,6 +319,7 @@ class AutoMFNet:
 
     def fit_parameters(
         self,
+        dag: nx.DiGraph,
         param_data: list[tuple[jnp.ndarray, jnp.ndarray]],
         n_iters: int = 5000,
         learning_rate: float = 1e-3,
@@ -313,11 +328,7 @@ class AutoMFNet:
         log_every: int = 100,
     ) -> MFNetJax:
         """Train the full-fidelity DAG with MFNetJax.fit."""
-        if self.dag is None:
-            raise RuntimeError(
-                "You must call extract_dag(...) before fit_parameters()."
-            )
-        mfnet = MFNetJax(self.dag)
+        mfnet = MFNetJax(dag)
         self.trained_mfnet = mfnet.fit(
             param_data,
             n_iters=n_iters,

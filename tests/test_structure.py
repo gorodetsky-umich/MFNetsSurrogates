@@ -224,19 +224,19 @@ def test_auto_mfnet_single_node_pipeline(key):
     x = jax.random.normal(key, (20, d))
     base = LinearModel(init_linear_params(key, d, d))
     y = base.run(x)
-    auto = AutoMFNet(
-        [base],
-        leaf_model_fn=lambda base: base,
-        edge_model_fn=lambda base, parents: base,
-    )
-    learner = auto.fit_structure([(x, y)], n_iters=20, learning_rate=1.0)
+    auto = AutoMFNet(sink_node=None)
+    learner = auto.fit_structure([base], [(x, y)], n_iters=20, learning_rate=1.0)
     assert isinstance(learner, MFNetStructureLearner)
-    dag = auto.extract_dag(threshold=0.0)
+    dag = auto.extract_dag(
+        threshold=0.0,
+        leaf_model_fn=lambda b: b,
+        edge_model_fn=lambda b, p: b,
+    )
     assert list(dag.nodes) == [0]
     # Sink node (0) should have no outgoing edges
     assert dag.out_degree(0) == 0
     mfnet = auto.fit_parameters(
-        [(x, y)], n_iters=20, learning_rate=1.0, verbose=False
+        dag, [(x, y)], n_iters=20, learning_rate=1.0, verbose=False
     )
     (pred,) = mfnet.run((0,), x)
     assert jnp.allclose(pred, y)
@@ -249,18 +249,18 @@ def test_auto_mfnet_two_node_no_edge(key):
     base1 = LinearModel(init_linear_params(key, d, d * 2))
     x = jax.random.normal(key, (30, d))
     y1 = base1.run(x)
-    auto = AutoMFNet(
-        [base0, base1],
-        leaf_model_fn=lambda base: base,
-        edge_model_fn=lambda base, parents: base,
+    auto = AutoMFNet(sink_node=None)
+    auto.fit_structure([base0, base1], [None, (x, y1)], n_iters=50, learning_rate=0.5)
+    dag = auto.extract_dag(
+        threshold=0.1,
+        leaf_model_fn=lambda b: b,
+        edge_model_fn=lambda b, p: b,
     )
-    auto.fit_structure([None, (x, y1)], n_iters=50, learning_rate=0.5)
-    dag = auto.extract_dag(threshold=0.1)
     assert set(dag.nodes) == {0, 1}
     # Sink node (1) must have no outgoing edges
     assert dag.out_degree(1) == 0
     mfnet = auto.fit_parameters(
-        [None, (x, y1)], n_iters=50, learning_rate=0.5, verbose=False
+        dag, [None, (x, y1)], n_iters=50, learning_rate=0.5, verbose=False
     )
     (pred1,) = mfnet.run((1,), x)
     assert jnp.allclose(pred1, y1, atol=1e-6)
