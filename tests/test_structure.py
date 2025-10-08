@@ -68,8 +68,10 @@ def test_sink_node_mask_enforced(key):
     # Other rows should remain ones
     assert jnp.all(mask[1, :] == 1.0)
 
+
 # ----------------------------------------------------------------------
 # New tests for the fit(train_data, ...) API
+
 
 def test_structure_learner_single_node_fit(key):
     # One node: δ(x) = 2*x + 3
@@ -91,6 +93,7 @@ def test_structure_learner_single_node_fit(key):
     assert out.shape == y.shape
     assert jnp.allclose(out, y, atol=1e-6)
 
+
 def test_structure_learner_partial_supervision(key):
     # Two nodes with same output dim: δ0(x)=x, δ1(x)=2x
     m0 = LinearModel(LinearParams(jnp.eye(3), jnp.zeros(3)))
@@ -106,7 +109,7 @@ def test_structure_learner_partial_supervision(key):
     learner.fit(train_data, n_iters=100, learning_rate=0.5)
 
     # After training, if we run on x:
-    F = learner.run(x)   # shape (2, batch, dim)
+    F = learner.run(x)  # shape (2, batch, dim)
     F0, F1 = F[0], F[1]
 
     # Node 0 still equals its δ0
