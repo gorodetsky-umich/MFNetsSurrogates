@@ -189,15 +189,11 @@ class MFNetStructureLearner:
         return model
 
     def get_weights(self) -> jnp.ndarray:
-        """
-        Return the learned adjacency matrix W, with any mask applied.
-        """
+        """Return learned adjacency matrix W with mask applied."""
         return self.adjacency_matrix * self.constraint_mask
 
     def adjacency_mask(self, threshold: float) -> jnp.ndarray:
-        """
-        Return a boolean mask of edges where |W_ij| > threshold.
-        """
+        """Return boolean mask of edges where |W_ij| > threshold."""
         W = self.get_weights()
         return jnp.abs(W) > threshold
 
@@ -207,9 +203,7 @@ class MFNetStructureLearner:
         node_funcs: Mapping[Any, Model],
         threshold: float,
     ) -> nx.DiGraph:
-        """
-        Convert the learned structure into a NetworkX DAG attaching provided models.
-        """
+        """Convert learned structure to a NetworkX DAG with provided models."""
         mask = self.adjacency_mask(threshold)
         G = nx.DiGraph()
         # 1) Add nodes

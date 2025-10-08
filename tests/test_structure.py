@@ -119,8 +119,8 @@ def test_structure_learner_partial_supervision(key):
 
 
 def test_structure_learner_recovers_known_dag(key):
-    """
-    Stage 1: learn W for a 3-node linear DAG.
+    """Stage 1: learn W for a 3-node linear DAG.
+
     True structure:
         0 → 1 with weight 0.5
         0 → 2 with weight 0.2
@@ -128,10 +128,10 @@ def test_structure_learner_recovers_known_dag(key):
     """
     # Build base linear models δ_j(x) = x @ (c_j I) with c_j=1,2,3
     d = 5
-    I = jnp.eye(d)
-    m0 = LinearModel(LinearParams(I, jnp.zeros(d)))
-    m1 = LinearModel(LinearParams(2 * I, jnp.zeros(d)))
-    m2 = LinearModel(LinearParams(3 * I, jnp.zeros(d)))
+    identity = jnp.eye(d)
+    m0 = LinearModel(LinearParams(identity, jnp.zeros(d)))
+    m1 = LinearModel(LinearParams(2 * identity, jnp.zeros(d)))
+    m2 = LinearModel(LinearParams(3 * identity, jnp.zeros(d)))
     # True adjacency
     W_true = jnp.array(
         [
