@@ -449,3 +449,76 @@ def test_optimizable_flag_effect(key):
         assert not jnp.allclose(initial, updated), (
             "Parameters should change when optimizable"
         )
+
+def test_three_node_subset_optimizable(key):
+    """Nodes 1 and 2 fixed, only node 3 should learn."""
+    import networkx as nx
+    from jax.tree_util import tree_leaves
+
+    # Dimensions
+    d_in, d1, d2, d3 = 2, 2, 3, 2
+
+    # Random keys
+    k1, k2, k3, kd = jax.random.split(key, 4)
+
+    # Build models
+    m1 = LinearModel(init_linear_params(k1, d_in, d1))
+
+    # Node 2: MLP enhancement of m1
+    mlp2 = MLPModel(init_mlp_params(k2, [d_in + d1, 8, d2]))
+    m2 = MLPEnhancementModel(mlp2)
+
+    # Node 3: MLP enhancement of m2
+    mlp3 = MLPModel(init_mlp_params(k3, [d_in + d2, 8, d3]))
+    m3 = MLPEnhancementModel(mlp3)
+
+    # Make graph 1→2→3
+    graph = nx.DiGraph()
+    graph.add_node(1, func=m1)
+    graph.add_node(2, func=m2)
+    graph.add_node(3, func=m3)
+    graph.add_edge(1, 2)
+    graph.add_edge(2, 3)
+    mfnet = MFNetJax(graph)
+
+    # Synthetic training data: make y3 = current output of node 3
+    x = jax.random.normal(kd, (50, d_in))
+    (y3,) = mfnet.run((3,), x)
+
+    # Train only node 3: others fixed
+    m1.set_optimizable(False)
+    m2.set_optimizable(False)
+    m3.set_optimizable(True)
+
+    # Prepare train_data: [None, None, (x,y3)]
+    train_data = [None, None, (x, y3)]
+
+    # Record initial leaves
+    init_leaves = tree_leaves(mfnet)
+
+    # Fit for a small number of steps
+    mfnet.fit(train_data, n_iters=200, learning_rate=1e-2, verbose=False)
+
+    # Record post-fit leaves
+    post_leaves = tree_leaves(mfnet)
+
+    # Count leaves per node
+    n1 = len(tree_leaves(m1))
+    n2 = len(tree_leaves(m2))
+    n3 = len(tree_leaves(m3))
+
+    # 1) Node 1 leaves unchanged
+    for before, after in zip(init_leaves[:n1], post_leaves[:n1]):
+        assert jnp.allclose(before, after), "Node1 params should remain fixed"
+
+    # 2) Node 2 leaves unchanged
+    for before, after in zip(
+        init_leaves[n1 : n1 + n2], post_leaves[n1 : n1 + n2]
+    ):
+        assert jnp.allclose(before, after), "Node2 params should remain fixed"
+
+    # 3) Node 3 leaves should change
+    for before, after in zip(
+        init_leaves[n1 + n2 :], post_leaves[n1 + n2 :]
+    ):
+        assert not jnp.allclose(before, after), "Node3 params should update"
