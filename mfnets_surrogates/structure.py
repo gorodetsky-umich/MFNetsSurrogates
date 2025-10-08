@@ -127,23 +127,29 @@ class MFNetStructureLearner:
 
     def structure_learning_loss(
         self,
-        x_input: jnp.ndarray,
-        y_targets: jnp.ndarray,
-        supervised_idx: jnp.ndarray,
+        train_data: list[tuple[jnp.ndarray, jnp.ndarray] | None],
     ) -> jnp.ndarray:
-        """Loss combining data fit, acyclicity, and sparsity penalties."""
-        F = self.run(x_input)
-        # Data-fit: only supervised nodes
-        y_pred = F[supervised_idx]
-        mse = jnp.mean((y_pred - y_targets) ** 2)
+        """Compute loss over multiple per-node datasets (data-fit + DAG & sparsity)."""
+        # Accumulate MSE only for supervised nodes
+        mse_total = 0.0
+        for j, entry in enumerate(train_data):
+            if entry is not None:
+                x_j, y_j = entry
+                # run => shape (n_nodes, batch_j, max_dim)
+                F = self.run(x_j)
+                d_j = y_j.shape[-1]
+                pred_j = F[j, :, :d_j]
+                mse_total += jnp.mean((pred_j - y_j) ** 2)
 
+        # Acyclicity penalty
         W = self.adjacency_matrix * self.constraint_mask
         H = W * W
         expm = jax.scipy.linalg.expm(H)
         h_pen = jnp.trace(expm) - self.n_nodes
+        # Sparsity penalty
         l1 = jnp.sum(jnp.abs(W))
 
-        return mse + self.alpha * h_pen + self.beta * l1
+        return mse_total + self.alpha * h_pen + self.beta * l1
 
     def fit(
         self,
