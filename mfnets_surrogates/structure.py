@@ -89,17 +89,38 @@ class MFNetStructureLearner:
 
     def run(self, x_input: jnp.ndarray) -> jnp.ndarray:
         """
-        Forward pass: compute base outputs, form and solve.
-
-        (I - W^T) F = Δ.
+        Forward pass: solve (I - W^T) F = Δ where each scalar W_ij is
+        applied to every coordinate of δ_i(x).
         """
+        # Shortcut for single node: just return its raw output
+        if self.n_nodes == 1:
+            return self.base_models[0].run(x_input)
+
+        # 1) Compute each base-model output δ_j(x) with shape (batch, d_j)
+        outputs = [m.run(x_input) for m in self.base_models]
+        dims = [o.shape[-1] for o in outputs]
+        max_dim = max(dims)
+
+        # 2) Pad each δ_j to width max_dim along last axis
+        padded = [
+            o if o.shape[-1] == max_dim
+            else jnp.pad(o, ((0, 0), (0, max_dim - o.shape[-1])))
+            for o in outputs
+        ]
+
+        # 3) Stack into Δ of shape (n_nodes, batch, max_dim)
+        delta = jnp.stack(padded, axis=0)
+
+        # 4) Form A = I - W^T and solve for F in each flattened coordinate
         W = self.adjacency_matrix * self.constraint_mask
-        # Compute Δ for each node
-        delta = jnp.stack([m.run(x_input) for m in self.base_models], axis=0)
-        # Build system matrix A
         A = jnp.eye(self.n_nodes) - W.T
-        # Solve linear system for F
-        F = jnp.linalg.solve(A, delta)
+
+        # Flatten batch and feature dims -> (n_nodes, batch*max_dim)
+        flat_delta = delta.reshape(self.n_nodes, -1)
+        flat_F = jnp.linalg.solve(A, flat_delta)
+
+        # Reshape back to (n_nodes, batch, max_dim)
+        F = flat_F.reshape(self.n_nodes, *delta.shape[1:])
         return F
 
     def structure_learning_loss(
