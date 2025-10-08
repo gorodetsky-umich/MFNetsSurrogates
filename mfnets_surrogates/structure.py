@@ -257,7 +257,9 @@ class AutoMFNet:
         """Learn adjacency matrix W and base-model parameters."""
         # Choose sink_node: user-supplied or highest-fidelity supervised node
         if self.sink_node is None:
-            sup_idxs = [i for i, d in enumerate(structure_data) if d is not None]
+            sup_idxs = [
+                i for i, d in enumerate(structure_data) if d is not None
+            ]
             primary_sink = sup_idxs[-1] if sup_idxs else None
         else:
             primary_sink = self.sink_node
