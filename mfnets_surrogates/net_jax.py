@@ -223,12 +223,19 @@ class MFNetJax:
                 model, target_nodes, x_list, y_list
             )
             # Filter out non-optimizable gradients
-            filtered_grads = [
-                grad
-                if model.graph.nodes[node]["func"].optimizable
-                else jnp.zeros_like(grad)
-                for node, grad in zip(model.eval_order, grads)
-            ]
+            grad_leaves, aux_data = tree_util.tree_flatten(grads)
+            nodes, edges, treedefs = aux_data
+            filtered_leaves = []
+            idx = 0
+            for node, tdef in zip(nodes, treedefs):
+                nleaf = tdef.num_leaves
+                sub = grad_leaves[idx:idx+nleaf]
+                if model.graph.nodes[node]["func"].optimizable:
+                    filtered_leaves.extend(sub)
+                else:
+                    filtered_leaves.extend([jnp.zeros_like(x) for x in sub])
+                idx += nleaf
+            filtered_grads = tree_util.tree_unflatten(aux_data, filtered_leaves)
 
             updates, new_opt_state = optimizer.update(
                 filtered_grads, opt_state, model
@@ -405,6 +412,7 @@ class MLPModel(Model):
         activation: Callable[[jnp.ndarray], jnp.ndarray] = jnn.gelu,
     ) -> None:
         """Initialize the MLP with its parameters and activation function."""
+        super().__init__()
         self.params = params
         self.activation = activation
 
@@ -580,8 +588,14 @@ class PCEModel(Model):
         children: list[Any],
     ) -> Self:
         """Unflatten the model from its parameters and static data."""
-        instance = cls(children[0], **aux_data)  # type: ignore
-        instance.optimizable = aux_data["optimizable"]
+        opt_flag = aux_data.pop("optimizable")
+        instance = cls(
+            children[0],
+            poly_type=aux_data["poly_type"],
+            degree=aux_data["degree"],
+            multi_indices=aux_data["multi_indices"],
+        )
+        instance.optimizable = opt_flag
         return instance
 
     def run(self, xin: jnp.ndarray) -> jnp.ndarray:
@@ -626,8 +640,14 @@ class PCEModel2D(Model):
         children: list[Any],
     ) -> Self:
         """Unflatten the model from its parameters and static data."""
-        instance = cls(children[0], **aux_data)  # type: ignore
-        instance.optimizable = aux_data["optimizable"]
+        opt_flag = aux_data.pop("optimizable")
+        instance = cls(
+            children[0],
+            poly_type=aux_data["poly_type"],
+            degree=aux_data["degree"],
+            multi_indices=aux_data["multi_indices"],
+        )
+        instance.optimizable = opt_flag
         return instance
 
     def run(self, xin: jnp.ndarray) -> jnp.ndarray:
