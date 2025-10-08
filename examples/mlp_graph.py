@@ -274,14 +274,18 @@ def main():
     # ------------------------------------------------------------------
     # 3. Two-stage AutoMFNet demonstration
     print("\n--- 3. Training AutoMFNet Discovered Structure ---")
-    # Stage-1 base models: simple linear leaves
+    # Stage-1 base models: use the same 3-layer MLPs as hard-coded graphs
     leaf_models = [
-        init_linear_model(jax.random.split(key, 5)[i], [d_in, 32, d_out])
+        init_mlp_model(
+            jax.random.split(key, 5)[i],
+            [d_in, 16, 16, d_out],
+            jax.nn.tanh,
+        )
         for i in range(4)
     ]
-    # Only supervise the highest-fidelity (node 4)
+    # Only supervise the highest-fidelity node (index 3)
     struct_data = [None, None, None, (x_train, y_train[3])]
-    auto = AutoMFNet(sink_node=4, alpha=0.1, beta=0.01)
+    auto = AutoMFNet(sink_node=3, alpha=0.1, beta=0.01)
     auto.fit_structure(
         leaf_models, struct_data, n_iters=2000, learning_rate=0.1
     )
