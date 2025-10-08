@@ -8,19 +8,19 @@ To run this example from the project root:
   1. Install the project in editable mode: `pip install -e ".[dev]"`
   2. Run the script: `python examples/basic_training.py`
 """
+
 import jax
-import jax.numpy as jnp
 import jaxopt
 
 # Import the components from your library
 from mfnets_surrogates.net_jax import (
-    MFNetJax,
     LinearModel,
+    MFNetJax,
     init_linear_params,
     init_linear_scale_shift_model,
     make_graph_2gen,
+    mse_loss_graph,
     resid_loss_graph,
-    mse_loss_graph
 )
 
 
@@ -50,16 +50,18 @@ def run_example():
     # Build the true graph and generate training data
     true_graph = make_graph_2gen(true_model1, true_model2)
     true_mfnet = MFNetJax(true_graph)
-    
+
     x_train = jax.random.normal(data_key, (n_samples, dim_in))
-    y_train_node1, y_train_node2 = true_mfnet.run(target_nodes=(1, 2), xinput=x_train)
+    y_train_node1, y_train_node2 = true_mfnet.run(
+        target_nodes=(1, 2), xinput=x_train
+    )
     y_train = (y_train_node1, y_train_node2)
 
     print(f"Generated {n_samples} samples of training data.")
 
     # --- 3. Initialize a Trainable Model ---
     # Create a new, randomly initialized network that we will train.
-    
+
     # Trainable low-fidelity model (Node 1)
     train_model1 = LinearModel(init_linear_params(train_key, dim_in, d1_out))
 
@@ -74,7 +76,9 @@ def run_example():
 
     # --- 4. Train the Model ---
     print("\nStarting model training...")
-    initial_mse = mse_loss_graph(mfnet_to_train, (1, 2), [x_train, x_train], y_train)
+    initial_mse = mse_loss_graph(
+        mfnet_to_train, (1, 2), [x_train, x_train], y_train
+    )
     print(f"Initial MSE: {initial_mse:.6f}")
 
     # Use a least-squares solver like Gauss-Newton, which is often efficient
@@ -91,7 +95,9 @@ def run_example():
     mfnet_fitted = res.params
 
     # --- 5. Evaluate the Fitted Model ---
-    final_mse = mse_loss_graph(mfnet_fitted, (1, 2), [x_train, x_train], y_train)
+    final_mse = mse_loss_graph(
+        mfnet_fitted, (1, 2), [x_train, x_train], y_train
+    )
     print(f"Final MSE:   {final_mse:.6f}")
     print("\nTraining complete.")
 

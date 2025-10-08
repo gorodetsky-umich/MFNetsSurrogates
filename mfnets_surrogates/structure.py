@@ -316,9 +316,7 @@ class AutoMFNet:
         for nid in G.nodes:
             node_dim = base_models[nid].output_dim()
             parent_ids = list(G.predecessors(nid))
-            parent_dims = [
-                base_models[p].output_dim() for p in parent_ids
-            ]
+            parent_dims = [base_models[p].output_dim() for p in parent_ids]
             if not parent_ids:
                 G.nodes[nid]["func"] = leaf_model_fn(nid, node_dim)
             else:

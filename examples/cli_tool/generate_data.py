@@ -1,6 +1,9 @@
 """Generates dummy data for the CLI tool example."""
-import numpy as np
+
 import os
+
+import numpy as np
+
 
 def main():
     """Generate and save training and prediction data."""

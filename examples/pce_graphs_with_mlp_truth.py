@@ -14,8 +14,8 @@ It performs the following steps:
 5. Creates a single, comprehensive 2x5 plot that visualizes each graph
    structure and the prediction performance for each PCE degree.
 """
+
 import os
-from functools import partial
 
 import jax
 import jax.numpy as jnp
@@ -27,15 +27,15 @@ from matplotlib import pyplot as plt
 from mfnets_surrogates import (
     MFNetJax,
     MLPModel,
-    PCEScaleShiftModel, # Import the new model
-    init_mlp_params,
     init_mlp_enhancement_model,
+    init_mlp_params,
     init_pce_model,
-    init_pce_scale_shift_model, # Import its initializer
+    init_pce_scale_shift_model,  # Import its initializer
     mse_loss_graph,
 )
 
 # --- Plotting and Graph Helpers ---
+
 
 def plot_graph_on_ax(ax, graph: nx.DiGraph, title: str):
     """Draw a NetworkX graph on a given Matplotlib Axes object."""
@@ -52,6 +52,7 @@ def plot_graph_on_ax(ax, graph: nx.DiGraph, title: str):
         arrowsize=20,
     )
     ax.set_title(title, fontsize=16)
+
 
 def plot_predictions_on_ax(ax, y_true, y_pred, mse: float, title: str):
     """Draw a predicted vs. actual scatter plot on a given Axes object."""
@@ -78,6 +79,7 @@ def plot_predictions_on_ax(ax, y_true, y_pred, mse: float, title: str):
     ax.grid(True, linestyle="--", alpha=0.6)
     ax.set_aspect("equal", adjustable="box")
 
+
 def train_graph(mfnet: MFNetJax, x_train_list, y_train, num_steps=15000):
     """A helper function to run the Optax training loop for a given graph."""
     target_nodes = tuple(sorted(mfnet.graph.nodes))
@@ -101,7 +103,7 @@ def train_graph(mfnet: MFNetJax, x_train_list, y_train, num_steps=15000):
     for _ in range(num_steps):
         params, opt_state = step(params, opt_state, x_train_list, y_train)
 
-    return treedef.unflatten(params)    
+    return treedef.unflatten(params)
 
 
 def _create_peer_pce_graph(key, d_in, d_out, degree) -> MFNetJax:
@@ -119,6 +121,7 @@ def _create_peer_pce_graph(key, d_in, d_out, degree) -> MFNetJax:
     graph.add_node(3, func=m3)
     return MFNetJax(graph)
 
+
 def _create_hierarchical_pce_graph(key, d_in, d_out, degree) -> MFNetJax:
     """Builds the Hierarchical graph (1->2->3) with PCEScaleShiftModels."""
     key1, key2, key3 = jax.random.split(key, 3)
@@ -133,7 +136,9 @@ def _create_hierarchical_pce_graph(key, d_in, d_out, degree) -> MFNetJax:
     graph.add_node(3, func=m3)
     return MFNetJax(graph)
 
+
 # --- Main Experiment ---
+
 
 def main():
     """Run the PCE graph comparison experiment."""
@@ -145,8 +150,12 @@ def main():
     print("--- 1. Generating data from a 'true' MLP-based model ---")
     key, m1_key, m2_key, m3_key = jax.random.split(key, 4)
     true_m1 = MLPModel(init_mlp_params(m1_key, [d_in, 16, d_out]), jax.nn.tanh)
-    true_m2 = init_mlp_enhancement_model(m2_key, [d_in + d_out, 16, d_out], jax.nn.tanh)
-    true_m3 = init_mlp_enhancement_model(m3_key, [d_in + d_out, 16, d_out], jax.nn.tanh)
+    true_m2 = init_mlp_enhancement_model(
+        m2_key, [d_in + d_out, 16, d_out], jax.nn.tanh
+    )
+    true_m3 = init_mlp_enhancement_model(
+        m3_key, [d_in + d_out, 16, d_out], jax.nn.tanh
+    )
 
     true_graph_struct = nx.DiGraph([(1, 2), (2, 3)])
     true_graph_struct.add_node(1, func=true_m1)
@@ -179,7 +188,9 @@ def main():
         print(f"\n--- 2. Training {name} Models ---")
         # Use the graph from the first model for plotting structure
         temp_graph = builder_fn(jax.random.PRNGKey(0), d_in, d_out, 1)
-        plot_graph_on_ax(ax_row[0], temp_graph.graph, f"{name} Graph Structure")
+        plot_graph_on_ax(
+            ax_row[0], temp_graph.graph, f"{name} Graph Structure"
+        )
 
         for degree in [1, 2, 3, 4]:
             print(f"  Training with PCE Degree: {degree}...")
@@ -192,7 +203,11 @@ def main():
             (y_pred,) = mfnet_trained.run((3,), x_test)
             test_mse = jnp.mean((y_true_hf - y_pred) ** 2)
             plot_predictions_on_ax(
-                ax_row[degree], y_true_hf, y_pred, test_mse, f"PCE Degree {degree}"
+                ax_row[degree],
+                y_true_hf,
+                y_pred,
+                test_mse,
+                f"PCE Degree {degree}",
             )
 
     # Finalize and save the plot
@@ -201,6 +216,7 @@ def main():
     fig.savefig(save_path)
     plt.close(fig)
     print(f"\nExperiment complete. Check '{save_path}' for results.")
+
 
 if __name__ == "__main__":
     main()

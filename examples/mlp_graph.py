@@ -13,24 +13,24 @@ This script performs the following steps:
 5. Creates a single, combined 2x3 plot showing the graph and prediction
    performance for each of the three candidate models.
 """
+
 import os
+from collections.abc import Callable
 
 import jax
 import jax.numpy as jnp
 import networkx as nx
-from typing import Dict, Callable
 import optax
 from jax import tree_util
 from matplotlib import pyplot as plt
 
 from mfnets_surrogates import (
+    AutoMFNet,
     MFNetJax,
     MLPModel,
-    init_linear_model,
-    init_mlp_model,
     init_mlp_enhancement_model,
+    init_mlp_model,
     init_mlp_params,
-    AutoMFNet,
     mse_loss_graph,
 )
 
@@ -88,6 +88,7 @@ def plot_predictions_on_ax(ax, y_true, y_pred, mse: float, title: str):
 
 # --- Training and Model Creation ---
 
+
 def train_graph(mfnet: MFNetJax, x_train_list, y_train, num_steps=5000):
     """Run the Optax training loop for a given graph."""
     target_nodes = tuple(sorted(mfnet.graph.nodes))
@@ -109,9 +110,11 @@ def train_graph(mfnet: MFNetJax, x_train_list, y_train, num_steps=5000):
     initial_loss = _calculate_loss(params, x_train_list, y_train)
     print(f"  Initial MSE Loss: {initial_loss:.6f}")
     for i in range(num_steps):
-        params, opt_state, loss = step(params, opt_state, x_train_list, y_train)
+        params, opt_state, loss = step(
+            params, opt_state, x_train_list, y_train
+        )
         if (i + 1) % 1000 == 0:
-            print(f"    Step {i+1}, Loss: {loss:.6f}")
+            print(f"    Step {i + 1}, Loss: {loss:.6f}")
 
     mfnet_fitted = treedef.unflatten(params)
     final_loss = mse_loss_graph(
@@ -123,7 +126,7 @@ def train_graph(mfnet: MFNetJax, x_train_list, y_train, num_steps=5000):
 
 def create_mfnet_from_graph(
     graph_struct: nx.DiGraph,
-    model_builders: Dict[int, Callable[[jax.Array], Callable]],
+    model_builders: dict[int, Callable[[jax.Array], Callable]],
     key: jax.Array,
 ) -> MFNetJax:
     """Create an MFNetJax instance from a graph and model builder functions."""
@@ -199,7 +202,8 @@ def main():
 
     # 1. Define True Data-Generating Process
     print("--- 1. Generating synthetic data ---")
-    x_all = jnp.linspace(-jnp.pi, jnp.pi, 400).reshape(-1, d_in)
+    num_data = 100
+    x_all = jnp.linspace(-jnp.pi, jnp.pi, num_data).reshape(-1, d_in)
     y1_all = 0.5 * jnp.cos(0.8 * x_all) - 0.2
     y2_all = y1_all**2 + 0.1 * jnp.sin(x_all)
     y3_all = 0.8 * jnp.sin(x_all) + 0.1
@@ -207,8 +211,8 @@ def main():
     y_all = (y1_all, y2_all, y3_all, y4_all)
 
     # Create data splits
-    train_indices = jax.random.permutation(key, 400)[:200]
-    test_indices = jnp.setdiff1d(jnp.arange(400), train_indices)
+    train_indices = jax.random.permutation(key, num_data)[: int(num_data / 2)]
+    test_indices = jnp.setdiff1d(jnp.arange(num_data), train_indices)
     x_train, x_test = x_all[train_indices], x_all[test_indices]
     y_train = tuple(y[train_indices] for y in y_all)
     y_test = tuple(y[test_indices] for y in y_all)
@@ -252,7 +256,7 @@ def main():
             config["builder"](d_in, d_out, jax.nn.tanh),
             subkey,
         )
-        
+
         x_train_list = [x_train] * len(y_train)
         trained_model = train_graph(model, x_train_list, y_train)
 
@@ -306,9 +310,7 @@ def main():
     # Diagnostic: print discovered DAG edges
     print(" Discovered DAG edges:", list(dag_auto.edges))
     # Plot discovered graph
-    plot_graph_on_ax(
-        ax_map["Auto"][0], dag_auto, "AutoMFNet Discovered Graph"
-    )
+    plot_graph_on_ax(ax_map["Auto"][0], dag_auto, "AutoMFNet Discovered Graph")
     # Stage-2: train all fidelities on this fixed DAG
     param_data = [(x_train, y) for y in y_train]
     # Diagnostic: compute pre-training MSE
@@ -325,7 +327,9 @@ def main():
     )
     y_pred_auto = mfnet_auto.run((3,), x_test)[0]
     mse_auto = jnp.mean((y_true_hf - y_pred_auto) ** 2)
-    mse_train_post = jnp.mean((y_train[3] - mfnet_auto.run((3,), x_train)[0]) ** 2)
+    mse_train_post = jnp.mean(
+        (y_train[3] - mfnet_auto.run((3,), x_train)[0]) ** 2
+    )
     print(f"  AutoMFNet Post-training MSE: {mse_train_post:1.6E}")
     print(f"  AutoMFNet Test MSE:          {mse_auto:1.6E}")
     # Plot predictions
