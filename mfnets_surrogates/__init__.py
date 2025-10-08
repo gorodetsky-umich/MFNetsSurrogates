@@ -68,4 +68,5 @@ __all__ = [
     "init_pc_additive_model",
     "init_pce_scale_shift_model",
     "make_graph_2gen",
+    "MFNetStructureLearner",
 ]
