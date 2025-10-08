@@ -9,8 +9,6 @@ from mfnets_surrogates import (
     MFNetStructureLearner,
 )
 
-import networkx as nx
-
 
 @pytest.fixture
 def key():
@@ -119,6 +117,7 @@ def test_structure_learner_partial_supervision(key):
     # Node 1 matches its δ1
     assert jnp.allclose(F1, y1, atol=1e-5)
 
+
 def test_structure_learner_recovers_known_dag(key):
     """
     Stage 1: learn W for a 3-node linear DAG.
@@ -134,37 +133,47 @@ def test_structure_learner_recovers_known_dag(key):
     m1 = LinearModel(LinearParams(2 * I, jnp.zeros(d)))
     m2 = LinearModel(LinearParams(3 * I, jnp.zeros(d)))
     # True adjacency
-    W_true = jnp.array([
-        [0.0, 0.5, 0.2],
-        [0.0, 0.0, 0.7],
-        [0.0, 0.0, 0.0],
-    ])
+    W_true = jnp.array(
+        [
+            [0.0, 0.5, 0.2],
+            [0.0, 0.0, 0.7],
+            [0.0, 0.0, 0.0],
+        ]
+    )
+
     def true_run(x):
         Δ = jnp.stack([m.run(x) for m in (m0, m1, m2)], axis=0)
         A = jnp.eye(3) - W_true.T
         flat = Δ.reshape(3, -1)
         sol = jnp.linalg.solve(A, flat)
         return sol.reshape(3, *Δ.shape[1:])
+
     # Generate data
     x = jax.random.normal(key, (2000, d))
     sol = true_run(x)
     train_data = [(x, sol[i]) for i in range(3)]
     # Fit
-    learner = MFNetStructureLearner([m0, m1, m2], sink_node=None, alpha=0.1, beta=0.01)
+    learner = MFNetStructureLearner(
+        [m0, m1, m2], sink_node=None, alpha=0.1, beta=0.01
+    )
     learner = learner.fit(train_data, n_iters=2000, learning_rate=0.5)
     # Threshold and compare
     threshold = 0.15
     W_learned = learner.adjacency_matrix
     adj_mask = jnp.abs(W_learned) > threshold
-    expected = jnp.array([
-        [False, True, True],
-        [False, False, True],
-        [False, False, False],
-    ])
+    expected = jnp.array(
+        [
+            [False, True, True],
+            [False, False, True],
+            [False, False, False],
+        ]
+    )
     assert jnp.array_equal(adj_mask, expected)
+
 
 # ----------------------------------------------------------------------
 # Phase 2: DAG extraction methods
+
 
 def test_get_weights_and_mask():
     # Two-node learner: manually set W, then test get_weights & adjacency_mask
@@ -179,17 +188,23 @@ def test_get_weights_and_mask():
     mask = learner.adjacency_mask(threshold=0.3)
     assert mask.tolist() == [[False, False], [True, False]]
 
+
 def test_to_graph_constructs_correct_dag():
     # Three-node learner: set W and build graph with to_graph()
-    base = [LinearModel(LinearParams(jnp.zeros((1, 1)), jnp.zeros(1))) for _ in range(3)]
+    base = [
+        LinearModel(LinearParams(jnp.zeros((1, 1)), jnp.zeros(1)))
+        for _ in range(3)
+    ]
     learner = MFNetStructureLearner(base, sink_node=None)
-    learner.adjacency_matrix = jnp.array([
-        [0.0, 0.6, 0.0],
-        [0.0, 0.0, 0.7],
-        [0.0, 0.0, 0.0],
-    ])
+    learner.adjacency_matrix = jnp.array(
+        [
+            [0.0, 0.6, 0.0],
+            [0.0, 0.0, 0.7],
+            [0.0, 0.0, 0.0],
+        ]
+    )
     funcs = {i: base[i] for i in range(3)}
-    G = learner.to_graph(node_ids=[0,1,2], node_funcs=funcs, threshold=0.5)
+    G = learner.to_graph(node_ids=[0, 1, 2], node_funcs=funcs, threshold=0.5)
     # nodes should be [0,1,2], edges only at (0,1) and (1,2)
     assert list(G.nodes) == [0, 1, 2]
     assert (0, 1) in G.edges

@@ -1,15 +1,16 @@
 """Structure learning module for MFNets."""
 
+from collections.abc import Mapping, Sequence
+from typing import Any
+
 import jax
 import jax.numpy as jnp
+import networkx as nx
 import optax
 from jax import tree_util
 from jax.tree_util import register_pytree_node_class
 
 from mfnets_surrogates.net_jax import Model
-
-import networkx as nx
-from typing import Any, Sequence, Mapping
 
 
 @register_pytree_node_class
