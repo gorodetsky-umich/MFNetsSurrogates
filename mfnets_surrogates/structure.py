@@ -211,11 +211,12 @@ class MFNetStructureLearner:
             if nid not in node_funcs:
                 raise KeyError(f"No model provided for node {nid!r}")
             G.add_node(nid, func=node_funcs[nid])
-        # 2) Add edges where mask is True
+        # 2) Add edges where mask is True, skipping any self-loops
         for i, src in enumerate(node_ids):
             for j, dst in enumerate(node_ids):
-                if mask[i, j]:
-                    G.add_edge(src, dst)
+                if i == j or not mask[i, j]:
+                    continue
+                G.add_edge(src, dst)
         return G
 
 
