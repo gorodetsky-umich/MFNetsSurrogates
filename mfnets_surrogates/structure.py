@@ -1,7 +1,7 @@
 """Structure learning module for MFNets."""
 
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import Any, Optional, Callable
 
 import jax
 import jax.numpy as jnp
@@ -10,7 +10,7 @@ import optax
 from jax import tree_util
 from jax.tree_util import register_pytree_node_class
 
-from mfnets_surrogates.net_jax import Model
+from mfnets_surrogates.net_jax import Model, MFNetJax, mse_loss_graph
 
 
 @register_pytree_node_class
@@ -217,3 +217,89 @@ class MFNetStructureLearner:
                 if mask[i, j]:
                     G.add_edge(src, dst)
         return G
+
+class AutoMFNet:
+    """
+    Two-stage Auto-MFNet orchestrator with separate fit & extract steps.
+
+    1) fit_structure(...) learns W and δ-models.
+    2) extract_dag(...) prunes W at any threshold and builds a DAG of full models.
+    3) fit_parameters(...) trains that DAG with MFNetJax.fit.
+    """
+    def __init__(
+        self,
+        base_models: Sequence[Model],
+        full_model_fn: Callable[[int, Model, Sequence[Model]], Model],
+        sink_node: Optional[int] = None,
+        alpha: float = 1.0,
+        beta: float = 1.0,
+    ):
+        self.base_models = list(base_models)
+        self.full_model_fn = full_model_fn
+        self.sink_node = sink_node
+        self.alpha = alpha
+        self.beta = beta
+
+        self.learner: Optional[MFNetStructureLearner] = None
+        self.dag: Optional[nx.DiGraph] = None
+        self.trained_mfnet: Optional[MFNetJax] = None
+
+    def fit_structure(
+        self,
+        structure_data: list[tuple[jnp.ndarray, jnp.ndarray] | None],
+        n_iters: int = 1000,
+        learning_rate: float = 1e-3,
+    ) -> MFNetStructureLearner:
+        learner = MFNetStructureLearner(
+            self.base_models,
+            sink_node=self.sink_node,
+            alpha=self.alpha,
+            beta=self.beta,
+        )
+        self.learner = learner.fit(
+            structure_data, n_iters=n_iters, learning_rate=learning_rate
+        )
+        return self.learner
+
+    def extract_dag(
+        self,
+        threshold: float,
+    ) -> nx.DiGraph:
+        if self.learner is None:
+            raise RuntimeError("You must call fit_structure(...) first.")
+
+        node_ids = list(range(self.learner.n_nodes))
+        # create initial graph with placeholder funcs
+        G = self.learner.to_graph(
+            node_ids=node_ids,
+            node_funcs={nid: None for nid in node_ids},
+            threshold=threshold,
+        )
+        for nid in G.nodes:
+            base = self.learner.base_models[nid]
+            parents = [self.learner.base_models[p] for p in G.predecessors(nid)]
+            G.nodes[nid]["func"] = self.full_model_fn(nid, base, parents)
+        self.dag = G
+        return G
+
+    def fit_parameters(
+        self,
+        param_data: list[tuple[jnp.ndarray, jnp.ndarray]],
+        n_iters: int = 5000,
+        learning_rate: float = 1e-3,
+        loss_fn: Callable = mse_loss_graph,
+        verbose: bool = True,
+        log_every: int = 100,
+    ) -> MFNetJax:
+        if self.dag is None:
+            raise RuntimeError("You must call extract_dag(...) before fit_parameters().")
+        mfnet = MFNetJax(self.dag)
+        self.trained_mfnet = mfnet.fit(
+            param_data,
+            n_iters=n_iters,
+            learning_rate=learning_rate,
+            loss_fn=loss_fn,
+            verbose=verbose,
+            log_every=log_every,
+        )
+        return self.trained_mfnet
