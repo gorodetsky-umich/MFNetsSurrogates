@@ -223,7 +223,7 @@ class MFNetJax:
                 model, target_nodes, x_list, y_list
             )
             # Filter out non-optimizable gradients
-            grad_leaves, aux_data = tree_util.tree_flatten(grads)
+            grad_leaves, aux_data = grads.tree_flatten()
             nodes, edges, treedefs = aux_data
             filtered_leaves = []
             idx = 0
@@ -235,7 +235,7 @@ class MFNetJax:
                 else:
                     filtered_leaves.extend([jnp.zeros_like(x) for x in sub])
                 idx += nleaf
-            filtered_grads = tree_util.tree_unflatten(aux_data, filtered_leaves)
+            filtered_grads = MFNetJax.tree_unflatten(aux_data, filtered_leaves)
 
             updates, new_opt_state = optimizer.update(
                 filtered_grads, opt_state, model
