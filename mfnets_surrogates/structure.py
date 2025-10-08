@@ -1,12 +1,14 @@
 """Structure learning module for MFNets."""
 
-from typing import List, Optional, Tuple
+
 import jax
 import jax.numpy as jnp
+import optax
 from jax import tree_util
 from jax.tree_util import register_pytree_node_class
-import optax
+
 from mfnets_surrogates.net_jax import Model
+
 
 @register_pytree_node_class
 class MFNetStructureLearner:
@@ -17,8 +19,8 @@ class MFNetStructureLearner:
 
     def __init__(
         self,
-        base_models: List[Model],
-        sink_node: Optional[int] = None,
+        base_models: list[Model],
+        sink_node: int | None = None,
         alpha: float = 1.0,
         beta: float = 1.0,
     ) -> None:
@@ -41,11 +43,11 @@ class MFNetStructureLearner:
         self.alpha = alpha
         self.beta = beta
 
-    def tree_flatten(self) -> Tuple[List[jnp.ndarray], Tuple]:
+    def tree_flatten(self) -> tuple[list[jnp.ndarray], tuple]:
         """
         Flatten parameters (W and base_models) for JAX transformations.
         """
-        leaves: List[jnp.ndarray] = [self.adjacency_matrix]
+        leaves: list[jnp.ndarray] = [self.adjacency_matrix]
         treedefs = []
 
         for model in self.base_models:
@@ -63,7 +65,9 @@ class MFNetStructureLearner:
         return leaves, aux_data
 
     @classmethod
-    def tree_unflatten(cls, aux_data: Tuple, children: List[jnp.ndarray]) -> "MFNetStructureLearner":
+    def tree_unflatten(
+        cls, aux_data: tuple, children: list[jnp.ndarray]
+    ) -> "MFNetStructureLearner":
         """
         Reconstruct instance from leaves and static data.
         """
@@ -144,7 +148,9 @@ class MFNetStructureLearner:
         @jax.jit
         def train_step(model, opt_state):
             loss, grads = jax.value_and_grad(
-                lambda m: m.structure_learning_loss(x_input, y_targets, supervised_idx)
+                lambda m: m.structure_learning_loss(
+                    x_input, y_targets, supervised_idx
+                )
             )(model)
             updates, opt_state = optimizer.update(grads, opt_state, model)
             model = optax.apply_updates(model, updates)
