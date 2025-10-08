@@ -598,7 +598,7 @@ class PCEModel(Model):
         children: list[Any],
     ) -> Self:
         """Unflatten the model from its parameters and static data."""
-        opt_flag = aux_data.pop("optimizable")
+        opt_flag = aux_data.pop("optimizable", True)
         instance = cls(
             children[0],
             poly_type=aux_data["poly_type"],
@@ -650,7 +650,7 @@ class PCEModel2D(Model):
         children: list[Any],
     ) -> Self:
         """Unflatten the model from its parameters and static data."""
-        opt_flag = aux_data.pop("optimizable")
+        opt_flag = aux_data.pop("optimizable", True)
         instance = cls(
             children[0],
             poly_type=aux_data["poly_type"],
