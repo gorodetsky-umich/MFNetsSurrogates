@@ -102,6 +102,8 @@ class MFNetJax:
         self.eval_order = list(nx.topological_sort(self.graph))
         self.parents = {
             n: sorted(self.graph.predecessors(n)) for n in self.eval_order
+            "optimizable": self.optimizable
+            "optimizable": self.optimizable
         }
         self.ancestors = {
             n: set(nx.ancestors(self.graph, n)) for n in self.eval_order
@@ -222,7 +224,13 @@ class MFNetJax:
             loss, grads = jax.value_and_grad(loss_fn)(
                 model, target_nodes, x_list, y_list
             )
-            updates, new_opt_state = optimizer.update(grads, opt_state, model)
+            # Filter out non-optimizable gradients
+            filtered_grads = [
+                grad if node["func"].optimizable else jnp.zeros_like(grad)
+                for node, grad in zip(model.eval_order, grads)
+            ]
+
+            updates, new_opt_state = optimizer.update(filtered_grads, opt_state, model)
             new_model = optax.apply_updates(model, updates)
             return new_model, new_opt_state, loss
 
@@ -266,6 +274,13 @@ class LinearParams(NamedTuple):
 class Model:
     """Base class for all models to ensure they are registered as PyTrees."""
 
+    def __init__(self):
+        self.optimizable = True
+
+    def set_optimizable(self, optimizable: bool) -> None:
+        """Set whether the model's parameters are optimizable."""
+        self.optimizable = optimizable
+
     def tree_flatten(self) -> tuple[list[Any], dict[str, Any]]:
         """Flatten the model's parameters into a list of arrays (leaves)."""
         raise NotImplementedError
@@ -284,18 +299,25 @@ class LinearModel(Model):
 
     def __init__(self, params: LinearParams) -> None:
         """Initialize the model with its parameters."""
+        super().__init__()
+        super().__init__()
+        super().__init__()
+        super().__init__()
+        super().__init__()
         self.params = params
 
     def tree_flatten(self) -> tuple[list[Any], dict[str, Any]]:
         """Flatten the model's parameters into a list of arrays (leaves)."""
-        return [self.params], {}
+        return [self.params], {"optimizable": self.optimizable}
 
     @classmethod
     def tree_unflatten(
         cls, aux_data: dict[str, Any], children: list[Any]
     ) -> Self:
         """Unflatten parameter arrays back into a model instance."""
-        return cls(children[0])  # type: ignore
+        instance = cls(children[0])  # type: ignore
+        instance.optimizable = aux_data["optimizable"]
+        return instance
 
     def run(self, xin: jnp.ndarray) -> jnp.ndarray:
         """Evaluate the model on a batch of input data."""
@@ -312,14 +334,16 @@ class LinearModel2D(Model):
 
     def tree_flatten(self) -> tuple[list[Any], dict[str, Any]]:
         """Flatten the model's parameters into a list of arrays (leaves)."""
-        return [self.params], {}
+        return [self.params], {"optimizable": self.optimizable}
 
     @classmethod
     def tree_unflatten(
         cls, aux_data: dict[str, Any], children: list[Any]
     ) -> Self:
         """Unflatten parameter arrays back into a model instance."""
-        return cls(children[0])  # type: ignore
+        instance = cls(children[0])  # type: ignore
+        instance.optimizable = aux_data["optimizable"]
+        return instance
 
     def run(self, xin: jnp.ndarray) -> jnp.ndarray:
         """Evaluate the model on a batch of input data."""
@@ -337,21 +361,30 @@ class LinearScaleShiftModel(Model):
         self, edge_model: LinearModel2D, node_model: LinearModel
     ) -> None:
         """Initialize the model with its edge and node sub-models."""
+        super().__init__()
+        super().__init__()
+        super().__init__()
         self.edge_model = edge_model
         self.node_model = node_model
 
     def tree_flatten(self) -> tuple[list[Any], dict[str, Any]]:
         """Flatten the model's parameters into a list of arrays (leaves)."""
-        return [self.edge_model, self.node_model], {}
+        return [self.edge_model, self.node_model], {"optimizable": self.optimizable}
 
     @classmethod
     def tree_unflatten(
         cls, aux_data: dict[str, Any], children: list[Any]
     ) -> Self:
         """Unflatten parameter arrays back into a model instance."""
-        return cls(children[0], children[1])  # type: ignore
+        instance = cls(children[0], children[1])  # type: ignore
+        instance.optimizable = aux_data["optimizable"]
+        return instance
 
-    def run(self, xin: jnp.ndarray, parent_val: jnp.ndarray) -> jnp.ndarray:
+    def set_optimizable(self, optimizable: bool) -> None:
+        """Set whether the model's parameters are optimizable."""
+        super().set_optimizable(optimizable)
+        self.edge_model.set_optimizable(optimizable)
+        self.node_model.set_optimizable(optimizable)
         """Evaluate the model: y = scale(x) @ parent_val + shift(x)."""
         edge_val = self.edge_model.run(xin)
         node_val = self.node_model.run(xin)
@@ -377,7 +410,7 @@ class MLPModel(Model):
 
     def tree_flatten(self) -> tuple[list[Any], dict[str, Any]]:
         """Flatten the model into its parameters and static data."""
-        return self.params, {"activation": self.activation}
+        return self.params, {"activation": self.activation, "optimizable": self.optimizable}
 
     @classmethod
     def tree_unflatten(
@@ -386,7 +419,9 @@ class MLPModel(Model):
         children: list[Any],
     ) -> Self:
         """Unflatten the model from its parameters and static data."""
-        return cls(children, aux_data["activation"])
+        instance = cls(children, aux_data["activation"])
+        instance.optimizable = aux_data["optimizable"]
+        return instance
 
     def run(self, xin: jnp.ndarray) -> jnp.ndarray:
         """Evaluate the MLP on a batch of input data."""
@@ -404,20 +439,26 @@ class MLPEnhancementModel(Model):
 
     def __init__(self, mlp_model: MLPModel) -> None:
         """Initialize the model with its internal MLP."""
+        super().__init__()
         self.mlp_model = mlp_model
 
     def tree_flatten(self) -> tuple[list[Any], dict[str, Any]]:
         """Flatten the model's parameters into a list of arrays (leaves)."""
-        return [self.mlp_model], {}
+        return [self.mlp_model], {"optimizable": self.optimizable}
 
     @classmethod
     def tree_unflatten(
         cls, aux_data: dict[str, Any], children: list[Any]
     ) -> Self:
         """Unflatten parameter arrays back into a model instance."""
-        return cls(children[0])  # type: ignore
+        instance = cls(children[0])  # type: ignore
+        instance.optimizable = aux_data["optimizable"]
+        return instance
 
-    def run(self, xin: jnp.ndarray, parent_val: jnp.ndarray) -> jnp.ndarray:
+    def set_optimizable(self, optimizable: bool) -> None:
+        """Set whether the model's parameters are optimizable."""
+        super().set_optimizable(optimizable)
+        self.mlp_model.set_optimizable(optimizable)
         """Evaluate the model on a batch of inputs and parent values."""
         combined_input = jnp.concatenate([xin, parent_val], axis=-1)
         return self.mlp_model.run(combined_input)
@@ -532,7 +573,9 @@ class PCEModel(Model):
         children: list[Any],
     ) -> Self:
         """Unflatten the model from its parameters and static data."""
-        return cls(children[0], **aux_data)  # type: ignore
+        instance = cls(children[0], **aux_data)  # type: ignore
+        instance.optimizable = aux_data["optimizable"]
+        return instance
 
     def run(self, xin: jnp.ndarray) -> jnp.ndarray:
         """Evaluate the PCE model on a batch of inputs."""
@@ -574,7 +617,9 @@ class PCEModel2D(Model):
         children: list[Any],
     ) -> Self:
         """Unflatten the model from its parameters and static data."""
-        return cls(children[0], **aux_data)  # type: ignore
+        instance = cls(children[0], **aux_data)  # type: ignore
+        instance.optimizable = aux_data["optimizable"]
+        return instance
 
     def run(self, xin: jnp.ndarray) -> jnp.ndarray:
         """Evaluate the PCE model on a batch of inputs."""
@@ -596,16 +641,22 @@ class PCEAdditiveModel(Model):
 
     def tree_flatten(self) -> tuple[list[Any], dict[str, Any]]:
         """Flatten the model's parameters into a list of arrays (leaves)."""
-        return [self.edge_model, self.node_model], {}
+        return [self.edge_model, self.node_model], {"optimizable": self.optimizable}
 
     @classmethod
     def tree_unflatten(
         cls, aux_data: dict[str, Any], children: list[Any]
     ) -> Self:
         """Unflatten parameter arrays back into a model instance."""
-        return cls(children[0], children[1])  # type: ignore
+        instance = cls(children[0], children[1])  # type: ignore
+        instance.optimizable = aux_data["optimizable"]
+        return instance
 
-    def run(self, xin: jnp.ndarray, parent_val: jnp.ndarray) -> jnp.ndarray:
+    def set_optimizable(self, optimizable: bool) -> None:
+        """Set whether the model's parameters are optimizable."""
+        super().set_optimizable(optimizable)
+        self.edge_model.set_optimizable(optimizable)
+        self.node_model.set_optimizable(optimizable)
         """Evaluate the model on a batch of inputs and parent values."""
         edge_input = jnp.concatenate([xin, parent_val], axis=-1)
         edge_val = self.edge_model.run(edge_input)
@@ -624,16 +675,22 @@ class PCEScaleShiftModel(Model):
 
     def tree_flatten(self) -> tuple[list[Any], dict[str, Any]]:
         """Flatten the model's parameters into a list of arrays (leaves)."""
-        return [self.edge_model, self.node_model], {}
+        return [self.edge_model, self.node_model], {"optimizable": self.optimizable}
 
     @classmethod
     def tree_unflatten(
         cls, aux_data: dict[str, Any], children: list[Any]
     ) -> Self:
         """Unflatten parameter arrays back into a model instance."""
-        return cls(children[0], children[1])  # type: ignore
+        instance = cls(children[0], children[1])  # type: ignore
+        instance.optimizable = aux_data["optimizable"]
+        return instance
 
-    def run(self, xin: jnp.ndarray, parent_val: jnp.ndarray) -> jnp.ndarray:
+    def set_optimizable(self, optimizable: bool) -> None:
+        """Set whether the model's parameters are optimizable."""
+        super().set_optimizable(optimizable)
+        self.edge_model.set_optimizable(optimizable)
+        self.node_model.set_optimizable(optimizable)
         """Evaluate the model: y = PCE_edge(x) @ parent_val + PCE_node(x)."""
         edge_val = self.edge_model.run(xin)
         node_val = self.node_model.run(xin)
