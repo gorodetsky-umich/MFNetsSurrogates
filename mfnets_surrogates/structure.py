@@ -284,13 +284,13 @@ class AutoMFNet:
     def extract_dag(
         self,
         threshold: float,
-        leaf_model_fn: Callable[[Model], Model],
-        edge_model_fn: Callable[[Model, Sequence[Model]], Model],
+        leaf_model_fn: Callable[[int, int], Model],
+        edge_model_fn: Callable[[int, int, Sequence[int]], Model],
     ) -> nx.DiGraph:
         """Prune W at threshold and build a DAG with full models.
 
-        leaf_model_fn: factory for nodes without parents.
-        edge_model_fn: factory for nodes with parents.
+        leaf_model_fn(node_id, node_dim) -> Model
+        edge_model_fn(node_id, node_dim, parent_dims) -> Model
         """
         if self.learner is None:
             raise RuntimeError("You must call fit_structure(...) first.")
@@ -303,14 +303,17 @@ class AutoMFNet:
             threshold=threshold,
         )
         for nid in G.nodes:
-            base = self.learner.base_models[nid]
-            parents = [
-                self.learner.base_models[p] for p in G.predecessors(nid)
+            node_dim = self.learner.base_models[nid].output_dim()
+            parent_ids = list(G.predecessors(nid))
+            parent_dims = [
+                self.learner.base_models[p].output_dim() for p in parent_ids
             ]
-            if not parents:
-                G.nodes[nid]["func"] = leaf_model_fn(base)
+            if not parent_ids:
+                G.nodes[nid]["func"] = leaf_model_fn(nid, node_dim)
             else:
-                G.nodes[nid]["func"] = edge_model_fn(base, parents)
+                G.nodes[nid]["func"] = edge_model_fn(
+                    nid, node_dim, parent_dims
+                )
         self.dag = G
         return G
 
