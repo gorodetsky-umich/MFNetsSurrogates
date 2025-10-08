@@ -38,7 +38,7 @@ from .net_jax import (
     mse_loss_graph,
     resid_loss_graph,
 )
-from .structure import MFNetStructureLearner
+from .structure import MFNetStructureLearner, AutoMFNet
 
 __all__ = [
     "MFNetJax",
@@ -70,4 +70,5 @@ __all__ = [
     "init_pce_scale_shift_model",
     "make_graph_2gen",
     "MFNetStructureLearner",
+    "AutoMFNet",
 ]
