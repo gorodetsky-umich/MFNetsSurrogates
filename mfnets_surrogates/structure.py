@@ -224,7 +224,8 @@ class AutoMFNet:
     Two-stage Auto-MFNet orchestrator with separate fit & extract steps.
 
     1) fit_structure(...) learns W and δ-models.
-    2) extract_dag(...) prunes W at any threshold and builds a DAG of full models.
+    2) extract_dag(...) prunes W at any threshold
+       and builds a DAG of full models.
     3) fit_parameters(...) trains that DAG with MFNetJax.fit.
     """
 
@@ -252,6 +253,7 @@ class AutoMFNet:
         n_iters: int = 1000,
         learning_rate: float = 1e-3,
     ) -> MFNetStructureLearner:
+        """Learn adjacency matrix W and base-model parameters."""
         learner = MFNetStructureLearner(
             self.base_models,
             sink_node=self.sink_node,
@@ -267,6 +269,7 @@ class AutoMFNet:
         self,
         threshold: float,
     ) -> nx.DiGraph:
+        """Prune W at threshold and build a DAG with full models."""
         if self.learner is None:
             raise RuntimeError("You must call fit_structure(...) first.")
 
@@ -295,6 +298,7 @@ class AutoMFNet:
         verbose: bool = True,
         log_every: int = 100,
     ) -> MFNetJax:
+        """Train the full-fidelity DAG with MFNetJax.fit."""
         if self.dag is None:
             raise RuntimeError(
                 "You must call extract_dag(...) before fit_parameters()."
