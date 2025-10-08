@@ -227,9 +227,9 @@ class MFNetJax:
             nodes, edges, treedefs = aux_data
             filtered_leaves = []
             idx = 0
-            for node, tdef in zip(nodes, treedefs):
+            for node, tdef in zip(nodes, treedefs, strict=False):
                 nleaf = tdef.num_leaves
-                sub = grad_leaves[idx:idx+nleaf]
+                sub = grad_leaves[idx : idx + nleaf]
                 if model.graph.nodes[node]["func"].optimizable:
                     filtered_leaves.extend(sub)
                 else:
@@ -292,7 +292,7 @@ class LinearParams(NamedTuple):
 class Model:
     """Base class for all models to ensure they are registered as PyTrees."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.optimizable = True
 
     def set_optimizable(self, optimizable: bool) -> None:
@@ -372,7 +372,9 @@ class LinearModel2D(Model):
 class LinearScaleShiftModel(Model):
     """A model that computes a scale-and-shift correction."""
 
-    def __init__(self, edge_model: LinearModel2D, node_model: LinearModel) -> None:
+    def __init__(
+        self, edge_model: LinearModel2D, node_model: LinearModel
+    ) -> None:
         """Initialize the model with its edge and node sub-models."""
         super().__init__()
         self.edge_model = edge_model
@@ -398,7 +400,6 @@ class LinearScaleShiftModel(Model):
         super().set_optimizable(optimizable)
         self.edge_model.set_optimizable(optimizable)
         self.node_model.set_optimizable(optimizable)
-
 
     def run(self, xin: jnp.ndarray, parent_val: jnp.ndarray) -> jnp.ndarray:
         """Evaluate the model: y = scale(x) @ parent_val + shift(x)."""

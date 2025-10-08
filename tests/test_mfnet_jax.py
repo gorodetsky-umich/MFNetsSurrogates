@@ -396,3 +396,56 @@ def test_mfnet_fit_method_overfits(key):
     # 6. Assert that the final loss is significantly smaller
     assert final_loss < initial_loss / 100
     assert final_loss < 1e-4
+
+
+def test_optimizable_flag_effect(key):
+    """Test that only optimizable parameters are updated during training."""
+    d_in, d_out = 2, 2
+    train_key, data_key = jax.random.split(key)
+
+    # Initialize a simple linear model
+    params = init_linear_params(train_key, d_in, d_out)
+    model = LinearModel(params)
+
+    # Create a graph with a single node
+    graph = nx.DiGraph()
+    graph.add_node(1, func=model)
+    mfnet = MFNetJax(graph)
+
+    # Generate a small dataset
+    x_train = jax.random.normal(data_key, (10, d_in))
+    y_train = jax.random.normal(data_key, (10, d_out))
+    train_data = [(x_train, y_train)]
+
+    # Set the model as non-optimizable
+    model.set_optimizable(False)
+
+    # Capture initial parameters
+    initial_params = jax.tree_util.tree_leaves(mfnet)
+
+    # Train the model
+    mfnet.fit(train_data, n_iters=100, learning_rate=1e-3, verbose=False)
+
+    # Capture parameters after training
+    final_params = jax.tree_util.tree_leaves(mfnet)
+
+    # Assert that parameters have not changed
+    for initial, final in zip(initial_params, final_params, strict=False):
+        assert jnp.allclose(initial, final), (
+            "Parameters should not change when non-optimizable"
+        )
+
+    # Set the model as optimizable
+    model.set_optimizable(True)
+
+    # Train the model again
+    mfnet.fit(train_data, n_iters=100, learning_rate=1e-3, verbose=False)
+
+    # Capture parameters after training
+    updated_params = jax.tree_util.tree_leaves(mfnet)
+
+    # Assert that parameters have changed
+    for initial, updated in zip(initial_params, updated_params, strict=False):
+        assert not jnp.allclose(initial, updated), (
+            "Parameters should change when optimizable"
+        )
