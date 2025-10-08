@@ -238,6 +238,7 @@ def main():
         "Peer": axes[:, 0],
         "Hierarchical": axes[:, 1],
         "Exact": axes[:, 2],
+        "Auto": axes[:, 3],
     }
 
     # 2. Train and evaluate each architecture
