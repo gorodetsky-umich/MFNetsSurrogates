@@ -225,10 +225,12 @@ class MFNetJax:
             # Filter out non-optimizable gradients
             filtered_grads = [
                 grad if node["func"].optimizable else jnp.zeros_like(grad)
-                for node, grad in zip(model.eval_order, grads)
+                for node, grad in zip(model.eval_order, grads, strict=False)
             ]
 
-            updates, new_opt_state = optimizer.update(filtered_grads, opt_state, model)
+            updates, new_opt_state = optimizer.update(
+                filtered_grads, opt_state, model
+            )
             new_model = optax.apply_updates(model, updates)
             return new_model, new_opt_state, loss
 
@@ -298,10 +300,6 @@ class LinearModel(Model):
     def __init__(self, params: LinearParams) -> None:
         """Initialize the model with its parameters."""
         super().__init__()
-        super().__init__()
-        super().__init__()
-        super().__init__()
-        super().__init__()
         self.params = params
 
     def tree_flatten(self) -> tuple[list[Any], dict[str, Any]]:
@@ -367,7 +365,9 @@ class LinearScaleShiftModel(Model):
 
     def tree_flatten(self) -> tuple[list[Any], dict[str, Any]]:
         """Flatten the model's parameters into a list of arrays (leaves)."""
-        return [self.edge_model, self.node_model], {"optimizable": self.optimizable}
+        return [self.edge_model, self.node_model], {
+            "optimizable": self.optimizable
+        }
 
     @classmethod
     def tree_unflatten(
@@ -383,6 +383,9 @@ class LinearScaleShiftModel(Model):
         super().set_optimizable(optimizable)
         self.edge_model.set_optimizable(optimizable)
         self.node_model.set_optimizable(optimizable)
+
+
+    def run(self, xin: jnp.ndarray, parent_val: jnp.ndarray) -> jnp.ndarray:
         """Evaluate the model: y = scale(x) @ parent_val + shift(x)."""
         edge_val = self.edge_model.run(xin)
         node_val = self.node_model.run(xin)
@@ -408,7 +411,10 @@ class MLPModel(Model):
 
     def tree_flatten(self) -> tuple[list[Any], dict[str, Any]]:
         """Flatten the model into its parameters and static data."""
-        return self.params, {"activation": self.activation, "optimizable": self.optimizable}
+        return self.params, {
+            "activation": self.activation,
+            "optimizable": self.optimizable,
+        }
 
     @classmethod
     def tree_unflatten(
@@ -457,6 +463,8 @@ class MLPEnhancementModel(Model):
         """Set whether the model's parameters are optimizable."""
         super().set_optimizable(optimizable)
         self.mlp_model.set_optimizable(optimizable)
+
+    def run(self, xin: jnp.ndarray, parent_val: jnp.ndarray) -> jnp.ndarray:
         """Evaluate the model on a batch of inputs and parent values."""
         combined_input = jnp.concatenate([xin, parent_val], axis=-1)
         return self.mlp_model.run(combined_input)
@@ -639,7 +647,9 @@ class PCEAdditiveModel(Model):
 
     def tree_flatten(self) -> tuple[list[Any], dict[str, Any]]:
         """Flatten the model's parameters into a list of arrays (leaves)."""
-        return [self.edge_model, self.node_model], {"optimizable": self.optimizable}
+        return [self.edge_model, self.node_model], {
+            "optimizable": self.optimizable
+        }
 
     @classmethod
     def tree_unflatten(
@@ -655,6 +665,8 @@ class PCEAdditiveModel(Model):
         super().set_optimizable(optimizable)
         self.edge_model.set_optimizable(optimizable)
         self.node_model.set_optimizable(optimizable)
+
+    def run(self, xin: jnp.ndarray, parent_val: jnp.ndarray) -> jnp.ndarray:
         """Evaluate the model on a batch of inputs and parent values."""
         edge_input = jnp.concatenate([xin, parent_val], axis=-1)
         edge_val = self.edge_model.run(edge_input)
@@ -673,7 +685,9 @@ class PCEScaleShiftModel(Model):
 
     def tree_flatten(self) -> tuple[list[Any], dict[str, Any]]:
         """Flatten the model's parameters into a list of arrays (leaves)."""
-        return [self.edge_model, self.node_model], {"optimizable": self.optimizable}
+        return [self.edge_model, self.node_model], {
+            "optimizable": self.optimizable
+        }
 
     @classmethod
     def tree_unflatten(
@@ -689,6 +703,8 @@ class PCEScaleShiftModel(Model):
         super().set_optimizable(optimizable)
         self.edge_model.set_optimizable(optimizable)
         self.node_model.set_optimizable(optimizable)
+
+    def run(self, xin: jnp.ndarray, parent_val: jnp.ndarray) -> jnp.ndarray:
         """Evaluate the model: y = PCE_edge(x) @ parent_val + PCE_node(x)."""
         edge_val = self.edge_model.run(xin)
         node_val = self.node_model.run(xin)
