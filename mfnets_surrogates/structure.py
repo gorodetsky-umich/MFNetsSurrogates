@@ -236,7 +236,8 @@ class AutoMFNet:
         alpha: float = 1.0,
         beta: float = 1.0,
     ):
-        """
+        """AutoMFNet orchestrator.
+
         Args:
             sink_node: index of node to freeze as sink (no outgoing edges).
             alpha: weight for acyclicity penalty.
@@ -290,8 +291,8 @@ class AutoMFNet:
         leaf_model_fn: Callable[[Model], Model],
         edge_model_fn: Callable[[Model, Sequence[Model]], Model],
     ) -> nx.DiGraph:
-        """
-        Prune W at threshold and build a DAG with full models.
+        """Prune W at threshold and build a DAG with full models.
+
         leaf_model_fn: factory for nodes without parents.
         edge_model_fn: factory for nodes with parents.
         """

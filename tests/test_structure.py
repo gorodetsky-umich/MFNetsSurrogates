@@ -256,7 +256,7 @@ def test_auto_mfnet_two_node_no_edge(key):
         [base0, base1], [None, (x, y1)], n_iters=50, learning_rate=0.5
     )
     dag = auto.extract_dag(
-        threshold=0.1,
+        threshold=1.0,
         leaf_model_fn=lambda b: b,
         edge_model_fn=lambda b, p: b,
     )
