@@ -337,6 +337,10 @@ class LinearModel(Model):
         """Evaluate the model on a batch of input data."""
         return xin @ self.params.weight.T + self.params.bias
 
+    def output_dim(self) -> int:
+        """Return this model’s output dimension (length of bias)."""
+        return int(self.params.bias.shape[-1])
+
 
 @register_pytree_node_class
 class LinearModel2D(Model):
@@ -453,6 +457,11 @@ class MLPModel(Model):
                 x = self.activation(x)
         return x
 
+    def output_dim(self) -> int:
+        """Return this MLP’s output dimension (last layer bias length)."""
+        last_params = self.params[-1]
+        return int(last_params.bias.shape[-1])
+
 
 @register_pytree_node_class
 class MLPEnhancementModel(Model):
@@ -485,6 +494,10 @@ class MLPEnhancementModel(Model):
         """Evaluate the model on a batch of inputs and parent values."""
         combined_input = jnp.concatenate([xin, parent_val], axis=-1)
         return self.mlp_model.run(combined_input)
+
+    def output_dim(self) -> int:
+        """Delegate to internal MLP’s output dimension."""
+        return self.mlp_model.output_dim()
 
 
 # --- Polynomial Chaos Expansion (PCE) Models ---
@@ -615,6 +628,10 @@ class PCEModel(Model):
         )
         return basis_matrix @ self.params.weight.T + self.params.bias
 
+    def output_dim(self) -> int:
+        """Return this PCE’s output dimension (length of bias)."""
+        return int(self.params.bias.shape[-1])
+
 
 @register_pytree_node_class
 class PCEModel2D(Model):
@@ -707,6 +724,10 @@ class PCEAdditiveModel(Model):
         node_val = self.node_model.run(xin)
         return edge_val + node_val
 
+    def output_dim(self) -> int:
+        """Delegate to the node_model’s output dimension."""
+        return self.node_model.output_dim()
+
 
 @register_pytree_node_class
 class PCEScaleShiftModel(Model):
@@ -745,6 +766,10 @@ class PCEScaleShiftModel(Model):
         node_val = self.node_model.run(xin)
         correction = jnp.einsum("sop,sp->so", edge_val, parent_val)
         return correction + node_val
+
+    def output_dim(self) -> int:
+        """Delegate to the node_model’s output dimension."""
+        return self.node_model.output_dim()
 
 
 # --- Initializer Functions ---
