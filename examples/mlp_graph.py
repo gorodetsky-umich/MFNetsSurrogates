@@ -216,15 +216,15 @@ def main():
     # Define the architectures to be tested
     architectures = {
         "Peer": {
-            "structure": nx.DiGraph([(1, 4), (2, 4), (3, 4)]),
+            "structure": nx.DiGraph([(0, 3), (1, 3), (2, 3)]),
             "builder": _build_peer_models,
         },
         "Hierarchical": {
-            "structure": nx.DiGraph([(1, 2), (2, 3), (3, 4)]),
+            "structure": nx.DiGraph([(0, 1), (1, 2), (2, 3)]),
             "builder": _build_hierarchical_models,
         },
         "Exact": {
-            "structure": nx.DiGraph([(1, 2), (2, 4), (3, 4)]),
+            "structure": nx.DiGraph([(0, 1), (1, 3), (2, 3)]),
             "builder": _build_exact_models,
         },
     }
@@ -255,7 +255,7 @@ def main():
         x_train_list = [x_train] * len(y_train)
         trained_model = train_graph(model, x_train_list, y_train)
 
-        y_pred = trained_model.run((4,), x_test)[0]
+        y_pred = trained_model.run((3,), x_test)[0]
         mse = jnp.mean((y_true_hf - y_pred) ** 2)
         print(f"  {name} Model Test MSE: {mse:1.6E}")
 
@@ -306,7 +306,7 @@ def main():
         learning_rate=1e-3,
         verbose=False,
     )
-    y_pred_auto = mfnet_auto.run((4,), x_test)[0]
+    y_pred_auto = mfnet_auto.run((3,), x_test)[0]
     mse_auto = jnp.mean((y_true_hf - y_pred_auto) ** 2)
     # Plot predictions
     plot_predictions_on_ax(
