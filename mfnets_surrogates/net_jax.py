@@ -264,8 +264,17 @@ class MFNetJax:
                     if history_callback is not None:
                         history_callback.append(loss_val)
 
+        # Copy updated parameters back into the original func instances,
+        # so we preserve their 'optimizable' flags.
         for node in self.eval_order:
-            self.graph.nodes[node]["func"] = model.graph.nodes[node]["func"]
+            orig = self.graph.nodes[node]["func"]
+            updated = model.graph.nodes[node]["func"]
+            # For simple models with a .params field, just overwrite the params
+            if hasattr(orig, "params") and hasattr(updated, "params"):
+                orig.params = updated.params
+            # Otherwise (composite models), replace fully
+            else:
+                self.graph.nodes[node]["func"] = updated
 
         return self
 
