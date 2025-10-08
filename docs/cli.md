@@ -33,9 +33,6 @@ This will output a table of available model types and the parameters you can con
 The YAML configuration file is the core of the CLI. It defines the graph structure, the models at each node, the training parameters, and the data to be used.
 
 Here is an example with explanations:
-
-You can control selective parameter freezing by adding an `optimizable` field under each model definition; set `optimizable: false` to freeze parameters during training.
-
 ```
 # The graph structure. 'nodes' is a list of all node IDs, and 'edges'
 # defines the connections between them.
