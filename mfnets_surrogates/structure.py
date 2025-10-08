@@ -129,14 +129,19 @@ class MFNetStructureLearner:
         self,
         train_data: list[tuple[jnp.ndarray, jnp.ndarray] | None],
     ) -> jnp.ndarray:
-        """Compute loss over multiple per-node datasets (data-fit + DAG & sparsity)."""
+        """
+        Compute loss over per-node datasets: data-fit, DAG & sparsity penalties.
+        """
         # Accumulate MSE only for supervised nodes
         mse_total = 0.0
         for j, entry in enumerate(train_data):
             if entry is not None:
                 x_j, y_j = entry
-                # run => shape (n_nodes, batch_j, max_dim)
+                # run ⇒ shape (n_nodes, batch_j, max_dim) or (batch_j, d) if single node
                 F = self.run(x_j)
+                if F.ndim == 2:
+                    # make it (1, batch, dim) so F[j, ...] works
+                    F = F[None, ...]
                 d_j = y_j.shape[-1]
                 pred_j = F[j, :, :d_j]
                 mse_total += jnp.mean((pred_j - y_j) ** 2)
