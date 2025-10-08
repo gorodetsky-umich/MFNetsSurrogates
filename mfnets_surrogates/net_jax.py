@@ -224,8 +224,10 @@ class MFNetJax:
             )
             # Filter out non-optimizable gradients
             filtered_grads = [
-                grad if node["func"].optimizable else jnp.zeros_like(grad)
-                for node, grad in zip(model.eval_order, grads, strict=False)
+                grad
+                if model.graph.nodes[node]["func"].optimizable
+                else jnp.zeros_like(grad)
+                for node, grad in zip(model.eval_order, grads)
             ]
 
             updates, new_opt_state = optimizer.update(
@@ -326,6 +328,7 @@ class LinearModel2D(Model):
 
     def __init__(self, params: LinearParams) -> None:
         """Initialize the model with its parameters."""
+        super().__init__()
         self.params = params
 
     def tree_flatten(self) -> tuple[list[Any], dict[str, Any]]:
@@ -353,12 +356,8 @@ class LinearModel2D(Model):
 class LinearScaleShiftModel(Model):
     """A model that computes a scale-and-shift correction."""
 
-    def __init__(
-        self, edge_model: LinearModel2D, node_model: LinearModel
-    ) -> None:
+    def __init__(self, edge_model: LinearModel2D, node_model: LinearModel) -> None:
         """Initialize the model with its edge and node sub-models."""
-        super().__init__()
-        super().__init__()
         super().__init__()
         self.edge_model = edge_model
         self.node_model = node_model
@@ -559,6 +558,7 @@ class PCEModel(Model):
         multi_indices: jnp.ndarray,
     ) -> None:
         """Initialize the PCE model."""
+        super().__init__()
         self.params = params
         self.poly_type = poly_type
         self.degree = degree
@@ -570,6 +570,7 @@ class PCEModel(Model):
             "poly_type": self.poly_type,
             "degree": self.degree,
             "multi_indices": self.multi_indices,
+            "optimizable": self.optimizable,
         }
 
     @classmethod
@@ -603,6 +604,7 @@ class PCEModel2D(Model):
         multi_indices: jnp.ndarray,
     ) -> None:
         """Initialize the PCE model."""
+        super().__init__()
         self.params = params
         self.poly_type = poly_type
         self.degree = degree
@@ -614,6 +616,7 @@ class PCEModel2D(Model):
             "poly_type": self.poly_type,
             "degree": self.degree,
             "multi_indices": self.multi_indices,
+            "optimizable": self.optimizable,
         }
 
     @classmethod
@@ -642,6 +645,7 @@ class PCEAdditiveModel(Model):
 
     def __init__(self, edge_model: LinearModel, node_model: PCEModel) -> None:
         """Initialize the model with its edge and node sub-models."""
+        super().__init__()
         self.edge_model = edge_model
         self.node_model = node_model
 
@@ -680,6 +684,7 @@ class PCEScaleShiftModel(Model):
 
     def __init__(self, edge_model: PCEModel2D, node_model: PCEModel) -> None:
         """Initialize the model with its edge and node sub-models."""
+        super().__init__()
         self.edge_model = edge_model
         self.node_model = node_model
 
