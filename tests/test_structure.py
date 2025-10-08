@@ -231,8 +231,8 @@ def test_auto_mfnet_single_node_pipeline(key):
     assert isinstance(learner, MFNetStructureLearner)
     dag = auto.extract_dag(
         threshold=0.0,
-        leaf_model_fn=lambda b: b,
-        edge_model_fn=lambda b, p: b,
+        leaf_model_fn=lambda nid, dim: base,
+        edge_model_fn=lambda nid, dim, pd: base,
     )
     assert list(dag.nodes) == [0]
     # Sink node (0) should have no outgoing edges
@@ -257,8 +257,8 @@ def test_auto_mfnet_two_node_no_edge(key):
     )
     dag = auto.extract_dag(
         threshold=1.0,
-        leaf_model_fn=lambda b: b,
-        edge_model_fn=lambda b, p: b,
+        leaf_model_fn=lambda nid, dim: [base0, base1][nid],
+        edge_model_fn=lambda nid, dim, pd: [base0, base1][nid],
     )
     assert set(dag.nodes) == {0, 1}
     # Sink node (1) must have no outgoing edges

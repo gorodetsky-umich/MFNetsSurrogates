@@ -292,10 +292,10 @@ def main():
     # Extract with MLP leaf & enhancement factories
     dag_auto = auto.extract_dag(
         threshold=0.1,
-        leaf_model_fn=lambda base: base,
-        edge_model_fn=lambda base, parents: init_mlp_enhancement_model(
+        leaf_model_fn=lambda nid, dim: leaf_models[nid],
+        edge_model_fn=lambda nid, dim, pd: init_mlp_enhancement_model(
             jax.random.split(key, 1)[0],
-            [d_in + parents[0].output_dim(), 32, d_out],
+            [d_in + pd[0], 32, dim],
         ),
     )
     # Diagnostic: print discovered DAG edges
