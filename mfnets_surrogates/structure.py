@@ -135,7 +135,7 @@ class MFNetStructureLearner:
     ) -> jnp.ndarray:
         """Compute loss over datasets: data-fit, DAG & sparsity penalties."""
         # Accumulate MSE only for supervised nodes
-        mse_total = 0.0
+        mse_total: jnp.ndarray = jnp.array(0.0)
         for j, entry in enumerate(train_data):
             if entry is not None:
                 x_j, y_j = entry
@@ -175,7 +175,10 @@ class MFNetStructureLearner:
         state = optimizer.init(self)
 
         @jax.jit
-        def train_step(model, opt_state):
+        def train_step(
+            model: "MFNetStructureLearner",
+            opt_state: optax.OptState,
+        ) -> tuple["MFNetStructureLearner", optax.OptState, jnp.ndarray]:
             loss, grads = jax.value_and_grad(
                 lambda m: m.structure_learning_loss(train_data)
             )(model)
@@ -296,10 +299,10 @@ class AutoMFNet:
             raise RuntimeError("You must call fit_structure(...) first.")
 
         node_ids = list(range(self.learner.n_nodes))
-        # create initial graph with placeholder funcs
+        # create initial graph with placeholder funcs (use base models)
         G = self.learner.to_graph(
             node_ids=node_ids,
-            node_funcs=dict.fromkeys(node_ids),
+            node_funcs={nid: self.base_models[nid] for nid in node_ids},
             threshold=threshold,
         )
         for nid in G.nodes:
