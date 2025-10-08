@@ -26,8 +26,10 @@ from matplotlib import pyplot as plt
 from mfnets_surrogates import (
     MFNetJax,
     MLPModel,
+    init_mlp_model,
     init_mlp_enhancement_model,
     init_mlp_params,
+    AutoMFNet,
     mse_loss_graph,
 )
 
