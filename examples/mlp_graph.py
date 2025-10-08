@@ -14,7 +14,6 @@ This script performs the following steps:
    performance for each of the three candidate models.
 """
 import os
-from typing import Callable, Dict
 
 import jax
 import jax.numpy as jnp
