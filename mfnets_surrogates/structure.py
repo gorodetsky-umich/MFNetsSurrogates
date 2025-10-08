@@ -307,10 +307,10 @@ class AutoMFNet:
             threshold=threshold,
         )
         for nid in G.nodes:
-            node_dim = self.learner.base_models[nid].output_dim()
+            node_dim = base_models[nid].output_dim()
             parent_ids = list(G.predecessors(nid))
             parent_dims = [
-                self.learner.base_models[p].output_dim() for p in parent_ids
+                base_models[p].output_dim() for p in parent_ids
             ]
             if not parent_ids:
                 G.nodes[nid]["func"] = leaf_model_fn(nid, node_dim)
