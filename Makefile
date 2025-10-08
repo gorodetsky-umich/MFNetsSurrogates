@@ -44,6 +44,10 @@ test: ## Run all tests with pytest
 	@echo "--> Running all tests with pytest..."
 	pytest
 
+test-structure: ## Run only the structure-learning tests
+	@echo "--> Running structure tests only..."
+	pytest tests/test_structure.py
+
 # ==============================================================================
 # Documentation
 # ==============================================================================
