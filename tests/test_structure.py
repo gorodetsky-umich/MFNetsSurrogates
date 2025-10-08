@@ -224,7 +224,11 @@ def test_auto_mfnet_single_node_pipeline(key):
     x = jax.random.normal(key, (20, d))
     base = LinearModel(init_linear_params(key, d, d))
     y = base.run(x)
-    auto = AutoMFNet([base], full_model_fn=lambda nid, base, parents: base)
+    auto = AutoMFNet(
+        [base],
+        leaf_model_fn=lambda base: base,
+        edge_model_fn=lambda base, parents: base,
+    )
     learner = auto.fit_structure([(x, y)], n_iters=20, learning_rate=1.0)
     assert isinstance(learner, MFNetStructureLearner)
     dag = auto.extract_dag(threshold=0.0)
@@ -246,7 +250,9 @@ def test_auto_mfnet_two_node_no_edge(key):
     x = jax.random.normal(key, (30, d))
     y1 = base1.run(x)
     auto = AutoMFNet(
-        [base0, base1], full_model_fn=lambda nid, base, parents: base
+        [base0, base1],
+        leaf_model_fn=lambda base: base,
+        edge_model_fn=lambda base, parents: base,
     )
     auto.fit_structure([None, (x, y1)], n_iters=50, learning_rate=0.5)
     dag = auto.extract_dag(threshold=0.1)

@@ -233,13 +233,15 @@ class AutoMFNet:
     def __init__(
         self,
         base_models: Sequence[Model],
-        full_model_fn: Callable[[int, Model, Sequence[Model]], Model],
+        leaf_model_fn: Callable[[Model], Model],
+        edge_model_fn: Callable[[Model, Sequence[Model]], Model],
         sink_node: int | None = None,
         alpha: float = 1.0,
         beta: float = 1.0,
     ):
         self.base_models = list(base_models)
-        self.full_model_fn = full_model_fn
+        self.leaf_model_fn = leaf_model_fn
+        self.edge_model_fn = edge_model_fn
         self.sink_node = sink_node
         self.alpha = alpha
         self.beta = beta
@@ -294,7 +296,10 @@ class AutoMFNet:
             parents = [
                 self.learner.base_models[p] for p in G.predecessors(nid)
             ]
-            G.nodes[nid]["func"] = self.full_model_fn(nid, base, parents)
+            if not parents:
+                G.nodes[nid]["func"] = self.leaf_model_fn(base)
+            else:
+                G.nodes[nid]["func"] = self.edge_model_fn(base, parents)
         self.dag = G
         return G
 
