@@ -135,16 +135,16 @@ def create_mfnet_from_graph(
 def _build_peer_models(d_in, d_out, activation):
     """Return a dictionary of model builders for the Peer architecture."""
     return {
+        0: lambda k: MLPModel(
+            init_mlp_params(k, [d_in, 16, 16, d_out]), activation
+        ),
         1: lambda k: MLPModel(
             init_mlp_params(k, [d_in, 16, 16, d_out]), activation
         ),
         2: lambda k: MLPModel(
             init_mlp_params(k, [d_in, 16, 16, d_out]), activation
         ),
-        3: lambda k: MLPModel(
-            init_mlp_params(k, [d_in, 16, 16, d_out]), activation
-        ),
-        4: lambda k: init_mlp_enhancement_model(
+        3: lambda k: init_mlp_enhancement_model(
             k, [d_in + 3 * d_out, 32, 32, d_out], activation
         ),
     }
@@ -153,16 +153,16 @@ def _build_peer_models(d_in, d_out, activation):
 def _build_hierarchical_models(d_in, d_out, activation):
     """Return a dictionary of model builders for the Hierarchical architecture."""
     return {
-        1: lambda k: MLPModel(
+        0: lambda k: MLPModel(
             init_mlp_params(k, [d_in, 16, 16, d_out]), activation
+        ),
+        1: lambda k: init_mlp_enhancement_model(
+            k, [d_in + d_out, 16, 16, d_out], activation
         ),
         2: lambda k: init_mlp_enhancement_model(
             k, [d_in + d_out, 16, 16, d_out], activation
         ),
         3: lambda k: init_mlp_enhancement_model(
-            k, [d_in + d_out, 16, 16, d_out], activation
-        ),
-        4: lambda k: init_mlp_enhancement_model(
             k, [d_in + d_out, 32, 32, d_out], activation
         ),
     }
@@ -171,16 +171,16 @@ def _build_hierarchical_models(d_in, d_out, activation):
 def _build_exact_models(d_in, d_out, activation):
     """Return a dictionary of model builders for the Exact architecture."""
     return {
-        1: lambda k: MLPModel(
+        0: lambda k: MLPModel(
             init_mlp_params(k, [d_in, 16, 16, d_out]), activation
         ),
-        2: lambda k: init_mlp_enhancement_model(
+        1: lambda k: init_mlp_enhancement_model(
             k, [d_in + d_out, 16, 16, d_out], activation
         ),
-        3: lambda k: MLPModel(
+        2: lambda k: MLPModel(
             init_mlp_params(k, [d_in, 16, 16, d_out]), activation
         ),
-        4: lambda k: init_mlp_enhancement_model(
+        3: lambda k: init_mlp_enhancement_model(
             k, [d_in + 2 * d_out, 32, 32, d_out], activation
         ),
     }
