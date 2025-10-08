@@ -506,7 +506,6 @@ def test_three_node_subset_optimizable(key):
     # Count leaves per node
     n1 = len(tree_leaves(m1))
     n2 = len(tree_leaves(m2))
-    n3 = len(tree_leaves(m3))
 
     # 1) Node 1 leaves unchanged
     for before, after in zip(init_leaves[:n1], post_leaves[:n1], strict=False):
