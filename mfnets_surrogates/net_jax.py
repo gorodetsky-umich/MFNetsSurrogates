@@ -299,6 +299,20 @@ class Model:
         """Set whether the model's parameters are optimizable."""
         self.optimizable = optimizable
 
+    # ------------------------------------------------------------------
+    # The two methods below give mypy a stable interface that all concrete
+    # models are expected to implement. They are intentionally kept
+    # abstract here, so subclasses must provide the actual logic.
+    # ------------------------------------------------------------------
+
+    def run(self, *args: Any, **kwargs: Any) -> jnp.ndarray:  # noqa: D401
+        """Run the model forward and return its output array."""
+        raise NotImplementedError
+
+    def output_dim(self) -> int:  # noqa: D401
+        """Return the dimension of this model's output vector."""
+        raise NotImplementedError
+
     def tree_flatten(self) -> tuple[list[Any], dict[str, Any]]:
         """Flatten the model's parameters into a list of arrays (leaves)."""
         raise NotImplementedError
