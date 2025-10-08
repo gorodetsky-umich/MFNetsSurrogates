@@ -1,6 +1,5 @@
 """Structure learning module for MFNets."""
 
-
 import jax
 import jax.numpy as jnp
 import optax
