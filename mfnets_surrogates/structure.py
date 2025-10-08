@@ -153,9 +153,7 @@ class MFNetStructureLearner:
 
     def fit(
         self,
-        x_input: jnp.ndarray,
-        y_targets: jnp.ndarray,
-        supervised_idx: jnp.ndarray,
+        train_data: list[tuple[jnp.ndarray, jnp.ndarray] | None],
         n_iters: int = 1000,
         learning_rate: float = 1e-3,
     ) -> "MFNetStructureLearner":
@@ -163,9 +161,7 @@ class MFNetStructureLearner:
         Train the structure learner.
 
         Args:
-            x_input: Input features for all samples.
-            y_targets: Stacked targets for supervised nodes.
-            supervised_idx: Indices of nodes with supervision.
+            train_data: List where each element is either (x_j, y_j) or None.
         """
         optimizer = optax.adam(learning_rate)
         state = optimizer.init(self)
@@ -173,9 +169,7 @@ class MFNetStructureLearner:
         @jax.jit
         def train_step(model, opt_state):
             loss, grads = jax.value_and_grad(
-                lambda m: m.structure_learning_loss(
-                    x_input, y_targets, supervised_idx
-                )
+                lambda m: m.structure_learning_loss(train_data)
             )(model)
             updates, opt_state = optimizer.update(grads, opt_state, model)
             model = optax.apply_updates(model, updates)
