@@ -128,7 +128,8 @@ class MFNetStructureLearner:
 
         # Reshape back to (n_nodes, batch, max_dim)
         F = flat_F.reshape(self.n_nodes, *delta.shape[1:])
-        return F
+        # Explicit cast so mypy knows this is an Array, not Any
+        return cast(jnp.ndarray, F)
 
     def structure_learning_loss(
         self,
@@ -300,10 +301,16 @@ class AutoMFNet:
             raise RuntimeError("You must call fit_structure(...) first.")
 
         node_ids = list(range(self.learner.n_nodes))
+
+        # Guard: fit_structure must have populated self.base_models
+        if self.base_models is None:  # pragma: no cover
+            raise RuntimeError("fit_structure() must be called first.")
+        base_models: list[Model] = self.base_models
+
         # create initial graph with placeholder funcs (use base models)
         G = self.learner.to_graph(
             node_ids=node_ids,
-            node_funcs={nid: self.base_models[nid] for nid in node_ids},
+            node_funcs={nid: base_models[nid] for nid in node_ids},
             threshold=threshold,
         )
         for nid in G.nodes:
