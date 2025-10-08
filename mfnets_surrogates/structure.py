@@ -11,7 +11,11 @@ from mfnets_surrogates.net_jax import Model
 
 @register_pytree_node_class
 class MFNetStructureLearner:
-    """Learns both the adjacency matrix W and base model parameters for a fully-connected graph, discovering a sparse DAG structure."""
+    """
+    Learns adjacency matrix W and base model parameters.
+
+    For a fully-connected graph, discovering a sparse DAG structure.
+    """
 
     def __init__(
         self,
@@ -84,7 +88,11 @@ class MFNetStructureLearner:
         return inst
 
     def run(self, x_input: jnp.ndarray) -> jnp.ndarray:
-        """Forward pass: compute base outputs, form and solve (I - W^T) F = Δ."""
+        """
+        Forward pass: compute base outputs, form and solve.
+
+        (I - W^T) F = Δ.
+        """
         W = self.adjacency_matrix * self.constraint_mask
         # Compute Δ for each node
         delta = jnp.stack([m.run(x_input) for m in self.base_models], axis=0)
