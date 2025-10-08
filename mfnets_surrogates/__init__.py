@@ -38,6 +38,7 @@ from .net_jax import (
     mse_loss_graph,
     resid_loss_graph,
 )
+from .structure import MFNetStructureLearner
 
 __all__ = [
     "MFNetJax",
