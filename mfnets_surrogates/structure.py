@@ -103,7 +103,8 @@ class MFNetStructureLearner:
 
         # 2) Pad each δ_j to width max_dim along last axis
         padded = [
-            o if o.shape[-1] == max_dim
+            o
+            if o.shape[-1] == max_dim
             else jnp.pad(o, ((0, 0), (0, max_dim - o.shape[-1])))
             for o in outputs
         ]
