@@ -9,6 +9,8 @@ from mfnets_surrogates import (
     MFNetStructureLearner,
 )
 
+import networkx as nx
+
 
 @pytest.fixture
 def key():
@@ -160,3 +162,36 @@ def test_structure_learner_recovers_known_dag(key):
         [False, False, False],
     ])
     assert jnp.array_equal(adj_mask, expected)
+
+# ----------------------------------------------------------------------
+# Phase 2: DAG extraction methods
+
+def test_get_weights_and_mask():
+    # Two-node learner: manually set W, then test get_weights & adjacency_mask
+    params0 = LinearParams(jnp.zeros((1, 1)), jnp.zeros(1))
+    params1 = LinearParams(jnp.zeros((1, 1)), jnp.zeros(1))
+    m0 = LinearModel(params0)
+    m1 = LinearModel(params1)
+    learner = MFNetStructureLearner([m0, m1], sink_node=None)
+    learner.adjacency_matrix = jnp.array([[0.0, 0.2], [0.5, 0.0]])
+    W = learner.get_weights()
+    assert jnp.allclose(W, learner.adjacency_matrix)
+    mask = learner.adjacency_mask(threshold=0.3)
+    assert mask.tolist() == [[False, False], [True, False]]
+
+def test_to_graph_constructs_correct_dag():
+    # Three-node learner: set W and build graph with to_graph()
+    base = [LinearModel(LinearParams(jnp.zeros((1, 1)), jnp.zeros(1))) for _ in range(3)]
+    learner = MFNetStructureLearner(base, sink_node=None)
+    learner.adjacency_matrix = jnp.array([
+        [0.0, 0.6, 0.0],
+        [0.0, 0.0, 0.7],
+        [0.0, 0.0, 0.0],
+    ])
+    funcs = {i: base[i] for i in range(3)}
+    G = learner.to_graph(node_ids=[0,1,2], node_funcs=funcs, threshold=0.5)
+    # nodes should be [0,1,2], edges only at (0,1) and (1,2)
+    assert list(G.nodes) == [0, 1, 2]
+    assert (0, 1) in G.edges
+    assert (1, 2) in G.edges
+    assert (0, 2) not in G.edges
