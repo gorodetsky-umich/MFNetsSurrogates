@@ -8,6 +8,9 @@ from jax.tree_util import register_pytree_node_class
 
 from mfnets_surrogates.net_jax import Model
 
+import networkx as nx
+from typing import Any, Sequence, Mapping
+
 
 @register_pytree_node_class
 class MFNetStructureLearner:
@@ -183,3 +186,39 @@ class MFNetStructureLearner:
         for _ in range(n_iters):
             model, state, _ = train_step(model, state)
         return model
+
+    def get_weights(self) -> jnp.ndarray:
+        """
+        Return the learned adjacency matrix W, with any mask applied.
+        """
+        return self.adjacency_matrix * self.constraint_mask
+
+    def adjacency_mask(self, threshold: float) -> jnp.ndarray:
+        """
+        Return a boolean mask of edges where |W_ij| > threshold.
+        """
+        W = self.get_weights()
+        return jnp.abs(W) > threshold
+
+    def to_graph(
+        self,
+        node_ids: Sequence[Any],
+        node_funcs: Mapping[Any, Model],
+        threshold: float,
+    ) -> nx.DiGraph:
+        """
+        Convert the learned structure into a NetworkX DAG attaching provided models.
+        """
+        mask = self.adjacency_mask(threshold)
+        G = nx.DiGraph()
+        # 1) Add nodes
+        for nid in node_ids:
+            if nid not in node_funcs:
+                raise KeyError(f"No model provided for node {nid!r}")
+            G.add_node(nid, func=node_funcs[nid])
+        # 2) Add edges where mask is True
+        for i, src in enumerate(node_ids):
+            for j, dst in enumerate(node_ids):
+                if mask[i, j]:
+                    G.add_edge(src, dst)
+        return G
