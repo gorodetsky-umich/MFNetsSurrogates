@@ -1,8 +1,7 @@
 """Structure learning module for MFNets."""
 
 from collections.abc import Callable, Mapping, Sequence
-from typing import cast
-from typing import Any
+from typing import Any, cast
 
 import jax
 import jax.numpy as jnp
