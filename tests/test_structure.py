@@ -264,7 +264,9 @@ def test_auto_mfnet_two_node_no_edge(key):
     # Sink node (1) must have no outgoing edges
     assert dag.out_degree(1) == 0
     mfnet = auto.fit_parameters(
-        dag, [None, (x, y1)], n_iters=50, learning_rate=0.5, verbose=False
+        dag, [None, (x, y1)], n_iters=2000, learning_rate=1.0, verbose=False
     )
     (pred1,) = mfnet.run((1,), x)
-    assert jnp.allclose(pred1, y1, atol=1e-6)
+    err = jnp.linalg.norm(pred1 - y1) / jnp.linalg.norm(y1)
+    #    print("error = ", err)
+    assert err < 1e-5

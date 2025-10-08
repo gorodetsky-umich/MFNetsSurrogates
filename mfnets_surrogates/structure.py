@@ -252,10 +252,6 @@ class AutoMFNet:
         self.dag: nx.DiGraph | None = None
         self.trained_mfnet: MFNetJax | None = None
 
-        self.learner: MFNetStructureLearner | None = None
-        self.dag: nx.DiGraph | None = None
-        self.trained_mfnet: MFNetJax | None = None
-
     def fit_structure(
         self,
         base_models: Sequence[Model],

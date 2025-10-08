@@ -26,6 +26,7 @@ from matplotlib import pyplot as plt
 from mfnets_surrogates import (
     MFNetJax,
     MLPModel,
+    init_linear_model,
     init_mlp_model,
     init_mlp_enhancement_model,
     init_mlp_params,
@@ -273,9 +274,9 @@ def main():
     # ------------------------------------------------------------------
     # 3. Two-stage AutoMFNet demonstration
     print("\n--- 3. Training AutoMFNet Discovered Structure ---")
-    # Stage-1 base models: simple MLP leaves
+    # Stage-1 base models: simple linear leaves
     leaf_models = [
-        init_mlp_model(jax.random.split(key, 5)[i], [d_in, 32, d_out])
+        init_linear_model(jax.random.split(key, 5)[i], [d_in, 32, d_out])
         for i in range(4)
     ]
     # Only supervise the highest-fidelity (node 4)
@@ -309,7 +310,7 @@ def main():
     mfnet_pre = MFNetJax(dag_auto)
     y_pre = mfnet_pre.run((3,), x_train)[0]
     mse_train_pre = jnp.mean((y_train[3] - y_pre) ** 2)
-    print(f"  AutoMFNet Pre-training MSE: {mse_train_pre:.6f}")
+    print(f"  AutoMFNet Pre-training MSE: {mse_train_pre:1.6E}")
     mfnet_auto = auto.fit_parameters(
         dag_auto,
         param_data,
@@ -320,8 +321,8 @@ def main():
     y_pred_auto = mfnet_auto.run((3,), x_test)[0]
     mse_auto = jnp.mean((y_true_hf - y_pred_auto) ** 2)
     mse_train_post = jnp.mean((y_train[3] - mfnet_auto.run((3,), x_train)[0]) ** 2)
-    print(f"  AutoMFNet Post-training MSE: {mse_train_post:.6f}")
-    print(f"  AutoMFNet Test MSE:          {mse_auto:.6f}")
+    print(f"  AutoMFNet Post-training MSE: {mse_train_post:1.6E}")
+    print(f"  AutoMFNet Test MSE:          {mse_auto:1.6E}")
     # Plot predictions
     plot_predictions_on_ax(
         ax_map["Auto"][1],
