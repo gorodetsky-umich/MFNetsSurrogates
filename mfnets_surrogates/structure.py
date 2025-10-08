@@ -1,7 +1,7 @@
 """Structure learning module for MFNets."""
 
-from collections.abc import Mapping, Sequence
-from typing import Any, Optional, Callable
+from collections.abc import Callable, Mapping, Sequence
+from typing import Any
 
 import jax
 import jax.numpy as jnp
@@ -10,7 +10,7 @@ import optax
 from jax import tree_util
 from jax.tree_util import register_pytree_node_class
 
-from mfnets_surrogates.net_jax import Model, MFNetJax, mse_loss_graph
+from mfnets_surrogates.net_jax import MFNetJax, Model, mse_loss_graph
 
 
 @register_pytree_node_class
@@ -218,6 +218,7 @@ class MFNetStructureLearner:
                     G.add_edge(src, dst)
         return G
 
+
 class AutoMFNet:
     """
     Two-stage Auto-MFNet orchestrator with separate fit & extract steps.
@@ -226,11 +227,12 @@ class AutoMFNet:
     2) extract_dag(...) prunes W at any threshold and builds a DAG of full models.
     3) fit_parameters(...) trains that DAG with MFNetJax.fit.
     """
+
     def __init__(
         self,
         base_models: Sequence[Model],
         full_model_fn: Callable[[int, Model, Sequence[Model]], Model],
-        sink_node: Optional[int] = None,
+        sink_node: int | None = None,
         alpha: float = 1.0,
         beta: float = 1.0,
     ):
@@ -240,9 +242,9 @@ class AutoMFNet:
         self.alpha = alpha
         self.beta = beta
 
-        self.learner: Optional[MFNetStructureLearner] = None
-        self.dag: Optional[nx.DiGraph] = None
-        self.trained_mfnet: Optional[MFNetJax] = None
+        self.learner: MFNetStructureLearner | None = None
+        self.dag: nx.DiGraph | None = None
+        self.trained_mfnet: MFNetJax | None = None
 
     def fit_structure(
         self,
@@ -272,12 +274,14 @@ class AutoMFNet:
         # create initial graph with placeholder funcs
         G = self.learner.to_graph(
             node_ids=node_ids,
-            node_funcs={nid: None for nid in node_ids},
+            node_funcs=dict.fromkeys(node_ids),
             threshold=threshold,
         )
         for nid in G.nodes:
             base = self.learner.base_models[nid]
-            parents = [self.learner.base_models[p] for p in G.predecessors(nid)]
+            parents = [
+                self.learner.base_models[p] for p in G.predecessors(nid)
+            ]
             G.nodes[nid]["func"] = self.full_model_fn(nid, base, parents)
         self.dag = G
         return G
@@ -292,7 +296,9 @@ class AutoMFNet:
         log_every: int = 100,
     ) -> MFNetJax:
         if self.dag is None:
-            raise RuntimeError("You must call extract_dag(...) before fit_parameters().")
+            raise RuntimeError(
+                "You must call extract_dag(...) before fit_parameters()."
+            )
         mfnet = MFNetJax(self.dag)
         self.trained_mfnet = mfnet.fit(
             param_data,
