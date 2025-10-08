@@ -1,6 +1,7 @@
 """Structure learning module for MFNets."""
 
 from collections.abc import Callable, Mapping, Sequence
+from typing import cast
 from typing import Any
 
 import jax
@@ -99,7 +100,8 @@ class MFNetStructureLearner:
         """
         # Shortcut for single node: just return its raw output
         if self.n_nodes == 1:
-            return self.base_models[0].run(x_input)
+            # mypy: explicit cast to satisfy static checker
+            return cast(jnp.ndarray, self.base_models[0].run(x_input))
 
         # 1) Compute each base-model output δ_j(x) with shape (batch, d_j)
         outputs = [m.run(x_input) for m in self.base_models]
