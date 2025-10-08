@@ -9,6 +9,8 @@ from mfnets_surrogates import (
     LinearParams,
     MFNetStructureLearner,
     init_linear_params,
+    init_linear_scale_shift_model,
+    LinearScaleShiftModel,
 )
 
 
