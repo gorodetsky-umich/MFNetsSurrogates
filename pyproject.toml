@@ -75,7 +75,12 @@ mfnets-run = "mfnets_surrogates.cli:app"
 packages = ["mfnets_surrogates"]
 
 [tool.ruff]
-include = ["mfnets_surrogates/**/*.py", "tests/**/*.py", "pyproject.toml"]
+include = [
+    "mfnets_surrogates/**/*.py",
+    "tests/**/*.py",
+    "examples/**/*.py",
+    "pyproject.toml",
+]
 exclude = [
     ".git",
     "__pycache__",
