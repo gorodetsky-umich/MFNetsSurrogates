@@ -307,7 +307,9 @@ class AutoMFNet:
         )
         for nid in G.nodes:
             base = self.learner.base_models[nid]
-            parents = [self.learner.base_models[p] for p in G.predecessors(nid)]
+            parents = [
+                self.learner.base_models[p] for p in G.predecessors(nid)
+            ]
             if not parents:
                 G.nodes[nid]["func"] = leaf_model_fn(base)
             else:

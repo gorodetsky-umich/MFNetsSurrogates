@@ -9,8 +9,6 @@ from mfnets_surrogates import (
     LinearParams,
     MFNetStructureLearner,
     init_linear_params,
-    init_linear_scale_shift_model,
-    LinearScaleShiftModel,
 )
 
 
@@ -227,7 +225,9 @@ def test_auto_mfnet_single_node_pipeline(key):
     base = LinearModel(init_linear_params(key, d, d))
     y = base.run(x)
     auto = AutoMFNet(sink_node=None)
-    learner = auto.fit_structure([base], [(x, y)], n_iters=20, learning_rate=1.0)
+    learner = auto.fit_structure(
+        [base], [(x, y)], n_iters=20, learning_rate=1.0
+    )
     assert isinstance(learner, MFNetStructureLearner)
     dag = auto.extract_dag(
         threshold=0.0,
@@ -252,7 +252,9 @@ def test_auto_mfnet_two_node_no_edge(key):
     x = jax.random.normal(key, (30, d))
     y1 = base1.run(x)
     auto = AutoMFNet(sink_node=None)
-    auto.fit_structure([base0, base1], [None, (x, y1)], n_iters=50, learning_rate=0.5)
+    auto.fit_structure(
+        [base0, base1], [None, (x, y1)], n_iters=50, learning_rate=0.5
+    )
     dag = auto.extract_dag(
         threshold=0.1,
         leaf_model_fn=lambda b: b,
