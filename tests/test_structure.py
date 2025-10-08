@@ -116,3 +116,47 @@ def test_structure_learner_partial_supervision(key):
     assert jnp.allclose(F0, m0.run(x), atol=1e-5)
     # Node 1 matches its δ1
     assert jnp.allclose(F1, y1, atol=1e-5)
+
+def test_structure_learner_recovers_known_dag(key):
+    """
+    Stage 1: learn W for a 3-node linear DAG.
+    True structure:
+        0 → 1 with weight 0.5
+        0 → 2 with weight 0.2
+        1 → 2 with weight 0.7
+    """
+    # Build base linear models δ_j(x) = x @ (c_j I) with c_j=1,2,3
+    d = 5
+    I = jnp.eye(d)
+    m0 = LinearModel(LinearParams(I, jnp.zeros(d)))
+    m1 = LinearModel(LinearParams(2 * I, jnp.zeros(d)))
+    m2 = LinearModel(LinearParams(3 * I, jnp.zeros(d)))
+    # True adjacency
+    W_true = jnp.array([
+        [0.0, 0.5, 0.2],
+        [0.0, 0.0, 0.7],
+        [0.0, 0.0, 0.0],
+    ])
+    def true_run(x):
+        Δ = jnp.stack([m.run(x) for m in (m0, m1, m2)], axis=0)
+        A = jnp.eye(3) - W_true.T
+        flat = Δ.reshape(3, -1)
+        sol = jnp.linalg.solve(A, flat)
+        return sol.reshape(3, *Δ.shape[1:])
+    # Generate data
+    x = jax.random.normal(key, (2000, d))
+    sol = true_run(x)
+    train_data = [(x, sol[i]) for i in range(3)]
+    # Fit
+    learner = MFNetStructureLearner([m0, m1, m2], sink_node=None, alpha=0.1, beta=0.01)
+    learner = learner.fit(train_data, n_iters=2000, learning_rate=0.5)
+    # Threshold and compare
+    threshold = 0.15
+    W_learned = learner.adjacency_matrix
+    adj_mask = jnp.abs(W_learned) > threshold
+    expected = jnp.array([
+        [False, True, True],
+        [False, False, True],
+        [False, False, False],
+    ])
+    assert jnp.array_equal(adj_mask, expected)
