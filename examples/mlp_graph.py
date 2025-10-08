@@ -18,6 +18,7 @@ import os
 import jax
 import jax.numpy as jnp
 import networkx as nx
+from typing import Dict, Callable
 import optax
 from jax import tree_util
 from matplotlib import pyplot as plt
