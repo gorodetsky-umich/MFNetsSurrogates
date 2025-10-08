@@ -12,5 +12,6 @@ This documentation provides a comprehensive guide to the library, including a tu
 -   **Composable Models**: Includes a suite of built-in models like `LinearModel`, `MLPModel`, and `PCEModel`.
 -   **Selective Parameter Freezing**: Freeze or unfreeze parameters of any node via the `optimizable` flag; see [Selective Parameter Freezing](optimizable.md).
 -   **AutoMFNet Two-Stage Pipeline**: Automatically discover graph structure and then train high-fidelity models; see [AutoMFNet Two-Stage Pipeline](auto_structure.md).
+-   **Structure Discovery**: Learn a sparse DAG directly from partial data via acyclicity and sparsity penalties.
 
 To get started, check out the **Tutorial**.

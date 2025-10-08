@@ -81,3 +81,21 @@ def main():
 if __name__ == "__main__":
     main()
 ```
+
+---
+
+## End-to-End with AutoMFNet
+
+```python
+# Stage 1 – structure learning
+learner = auto.fit_structure(base_models, structure_data)
+
+# Stage 1.5 – prune and build DAG
+dag = auto.extract_dag(0.1, leaf_fn, edge_fn)
+
+# Stage 2 – parameter learning on fixed DAG
+mfnet = auto.fit_parameters(dag, param_data)
+```
+
+Inspect `learner.get_weights()` to view the learned adjacency matrix and use
+`networkx.draw(dag)` to visualise the discovered graph.
