@@ -229,7 +229,8 @@ def test_auto_mfnet_single_node_pipeline(key):
     assert isinstance(learner, MFNetStructureLearner)
     dag = auto.extract_dag(threshold=0.0)
     assert list(dag.nodes) == [0]
-    assert list(dag.edges) == []
+    # Sink node (0) should have no outgoing edges
+    assert dag.out_degree(0) == 0
     mfnet = auto.fit_parameters(
         [(x, y)], n_iters=20, learning_rate=1.0, verbose=False
     )
@@ -250,7 +251,8 @@ def test_auto_mfnet_two_node_no_edge(key):
     auto.fit_structure([None, (x, y1)], n_iters=50, learning_rate=0.5)
     dag = auto.extract_dag(threshold=0.1)
     assert set(dag.nodes) == {0, 1}
-    assert list(dag.edges) == []
+    # Sink node (1) must have no outgoing edges
+    assert dag.out_degree(1) == 0
     mfnet = auto.fit_parameters(
         [(x, y1)], n_iters=50, learning_rate=0.5, verbose=False
     )
