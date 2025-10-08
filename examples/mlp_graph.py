@@ -284,6 +284,10 @@ def main():
     auto.fit_structure(
         leaf_models, struct_data, n_iters=2000, learning_rate=0.1
     )
+    # Diagnostic: print learned adjacency matrix
+    W_learned = auto.learner.get_weights()
+    print(" Learned W matrix (after structure fit):")
+    print(W_learned)
     # Extract with MLP leaf & enhancement factories
     dag_auto = auto.extract_dag(
         threshold=0.1,
@@ -293,12 +297,19 @@ def main():
             [d_in + parents[0].output_dim(), 32, d_out],
         ),
     )
+    # Diagnostic: print discovered DAG edges
+    print(" Discovered DAG edges:", list(dag_auto.edges))
     # Plot discovered graph
     plot_graph_on_ax(
         ax_map["Auto"][0], dag_auto, "AutoMFNet Discovered Graph"
     )
     # Stage-2: train all fidelities on this fixed DAG
     param_data = [(x_train, y) for y in y_train]
+    # Diagnostic: compute pre-training MSE
+    mfnet_pre = MFNetJax(dag_auto)
+    y_pre = mfnet_pre.run((3,), x_train)[0]
+    mse_train_pre = jnp.mean((y_train[3] - y_pre) ** 2)
+    print(f"  AutoMFNet Pre-training MSE: {mse_train_pre:.6f}")
     mfnet_auto = auto.fit_parameters(
         dag_auto,
         param_data,
@@ -308,6 +319,9 @@ def main():
     )
     y_pred_auto = mfnet_auto.run((3,), x_test)[0]
     mse_auto = jnp.mean((y_true_hf - y_pred_auto) ** 2)
+    mse_train_post = jnp.mean((y_train[3] - mfnet_auto.run((3,), x_train)[0]) ** 2)
+    print(f"  AutoMFNet Post-training MSE: {mse_train_post:.6f}")
+    print(f"  AutoMFNet Test MSE:          {mse_auto:.6f}")
     # Plot predictions
     plot_predictions_on_ax(
         ax_map["Auto"][1],
