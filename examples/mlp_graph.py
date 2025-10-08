@@ -228,7 +228,7 @@ def main():
     }
 
     # Setup the combined plot
-    fig, axes = plt.subplots(2, 3, figsize=(22, 12), dpi=120)
+    fig, axes = plt.subplots(2, 4, figsize=(28, 12), dpi=120)
     fig.suptitle(
         "Comparison of Multi-Fidelity Graph Architectures", fontsize=24
     )
@@ -266,6 +266,53 @@ def main():
             mse,
             f"{name} Model Predictions",
         )
+
+    # ------------------------------------------------------------------
+    # 3. Two-stage AutoMFNet demonstration
+    print("\n--- 3. Training AutoMFNet Discovered Structure ---")
+    # Stage-1 base models: simple MLP leaves
+    leaf_models = [
+        init_mlp_model(jax.random.split(key, 5)[i], [d_in, 32, d_out])
+        for i in range(4)
+    ]
+    # Only supervise the highest-fidelity (node 4)
+    struct_data = [None, None, None, (x_train, y_train[3])]
+    auto = AutoMFNet(sink_node=4, alpha=0.1, beta=0.01)
+    auto.fit_structure(
+        leaf_models, struct_data, n_iters=2000, learning_rate=0.1
+    )
+    # Extract with MLP leaf & enhancement factories
+    dag_auto = auto.extract_dag(
+        threshold=0.1,
+        leaf_model_fn=lambda base: base,
+        edge_model_fn=lambda base, parents: init_mlp_enhancement_model(
+            jax.random.split(key, 1)[0],
+            [d_in + parents[0].output_dim(), 32, d_out],
+        ),
+    )
+    # Plot discovered graph
+    plot_graph_on_ax(
+        ax_map["Auto"][0], dag_auto, "AutoMFNet Discovered Graph"
+    )
+    # Stage-2: train all fidelities on this fixed DAG
+    param_data = [(x_train, y) for y in y_train]
+    mfnet_auto = auto.fit_parameters(
+        dag_auto,
+        param_data,
+        n_iters=5000,
+        learning_rate=1e-3,
+        verbose=False,
+    )
+    y_pred_auto = mfnet_auto.run((4,), x_test)[0]
+    mse_auto = jnp.mean((y_true_hf - y_pred_auto) ** 2)
+    # Plot predictions
+    plot_predictions_on_ax(
+        ax_map["Auto"][1],
+        y_true_hf,
+        y_pred_auto,
+        mse_auto,
+        "AutoMFNet Predictions",
+    )
 
     # Finalize and save the combined plot
     plt.tight_layout(rect=[0, 0.03, 1, 0.96])
