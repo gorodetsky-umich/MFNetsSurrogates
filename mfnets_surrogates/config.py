@@ -1,6 +1,6 @@
 """Pydantic models for the CLI configuration file."""
 
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -62,15 +62,15 @@ class Config(BaseModel):
     )
 
     # Optional model templates used exclusively in auto mode
-    base_models: Optional[dict[int | str, ModelParams]] = Field(
+    base_models: dict[int | str, ModelParams] | None = Field(
         default=None,
         description="Per-node δ-model definitions for Stage-1 (auto mode).",
     )
-    leaf_model: Optional[ModelParams] = Field(
+    leaf_model: ModelParams | None = Field(
         default=None,
         description="Factory template for leaf nodes in Stage-2 (auto mode).",
     )
-    edge_model: Optional[ModelParams] = Field(
+    edge_model: ModelParams | None = Field(
         default=None,
         description="Factory template for edge/enhancement nodes in Stage-2 "
         "(auto mode).",
