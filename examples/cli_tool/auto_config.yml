@@ -42,7 +42,15 @@ training:
   num_steps: 5000
 
 datasets:
+  # --- Stage-2 training data --------------------------------------------
   - name: "train_data"
     type: "training"
     data_path: "examples/cli_tool/training_data.npz"
     nodes: [1, 2]
+
+  # --- Prediction task ---------------------------------------------------
+  - name: "predict_hf"
+    type: "prediction"
+    data_path: "examples/cli_tool/prediction_inputs.npz"   # input X
+    nodes: [2]                                             # highest-fidelity node
+    output_path: "results/auto_hf_predictions.npz"         # saved NPZ with y_predict
