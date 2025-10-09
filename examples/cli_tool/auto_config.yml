@@ -12,6 +12,9 @@ base_models:
   2:
     type: "MLPModel"
     params: {}
+  3:
+    type: "MLPModel"
+    params: {}
 
 leaf_model:
   type: "PCEModel"
@@ -24,8 +27,8 @@ edge_model:
   params: {}
 
 graph:
-  nodes: [1, 2]
-  edges: [[1, 2]]
+  nodes: [1, 2, 3]
+  edges: [[1, 2], [2, 3]]
 
 models:
   1:
@@ -36,21 +39,22 @@ models:
   2:
     type: "MLPModel"
     params: {}
+  3:
+    type: "MLPModel"
+    params: {}
 
 training:
   learning_rate: 0.001
   num_steps: 5000
 
 datasets:
-  # --- Stage-2 training data --------------------------------------------
   - name: "train_data"
     type: "training"
     data_path: "examples/cli_tool/training_data.npz"
-    nodes: [1, 2]
+    nodes: [1, 2, 3]
 
-  # --- Prediction task ---------------------------------------------------
   - name: "predict_hf"
     type: "prediction"
-    data_path: "examples/cli_tool/prediction_inputs.npz"   # input X
-    nodes: [2]                                             # highest-fidelity node
-    output_path: "results/auto_hf_predictions.npz"         # saved NPZ with y_predict
+    data_path: "examples/cli_tool/prediction_inputs.npz"
+    nodes: [3]
+    output_path: "results/auto_hf_predictions.npz"

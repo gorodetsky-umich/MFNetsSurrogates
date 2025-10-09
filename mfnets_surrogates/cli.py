@@ -289,6 +289,9 @@ def _process_prediction_tasks(mfnet: net_jax.MFNetJax, config: Config) -> None:
         target_node = task.nodes[0]
         console.print(f"Generating predictions for node: {target_node}")
 
+        if target_node not in mfnet.graph.nodes:
+            console.print(f"[red]Node {target_node} not in trained graph![/red]")
+            raise typer.Exit(code=1)
         (y_predict,) = mfnet.run((target_node,), x_predict)
         console.print(f"Generated predictions with shape {y_predict.shape}")
 
