@@ -1,6 +1,6 @@
 """Pydantic models for the CLI configuration file."""
 
-from typing import Any, Literal
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -34,6 +34,47 @@ class DataSet(BaseModel):
 
 class Config(BaseModel):
     """The root model for the YAML configuration file."""
+
+    # ------------------------------------------------------------------
+    # Two-stage Auto-MFNet specific fields
+    # ------------------------------------------------------------------
+
+    mode: Literal["fixed", "auto"] = Field(
+        default="fixed",
+        description='Run-mode selector: "fixed" (default) executes the classic '
+        "single-stage training, whereas ``auto`` triggers the two-stage "
+        "structure-learning pipeline.",
+    )
+    alpha: float = Field(
+        1.0,
+        description="Acyclicity penalty weight for structure learning "
+        "(auto mode only).",
+    )
+    beta: float = Field(
+        1.0,
+        description="L1 sparsity penalty weight for structure learning "
+        "(auto mode only).",
+    )
+    threshold: float = Field(
+        0.1,
+        description="Edge-pruning threshold |W_ij| ≤ τ during DAG extraction "
+        "(auto mode only).",
+    )
+
+    # Optional model templates used exclusively in auto mode
+    base_models: Optional[dict[int | str, ModelParams]] = Field(
+        default=None,
+        description="Per-node δ-model definitions for Stage-1 (auto mode).",
+    )
+    leaf_model: Optional[ModelParams] = Field(
+        default=None,
+        description="Factory template for leaf nodes in Stage-2 (auto mode).",
+    )
+    edge_model: Optional[ModelParams] = Field(
+        default=None,
+        description="Factory template for edge/enhancement nodes in Stage-2 "
+        "(auto mode).",
+    )
 
     graph: dict[str, list[Any]] = Field(
         description="Defines the graph structure with nodes and edges."
