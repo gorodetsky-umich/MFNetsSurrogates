@@ -6,14 +6,18 @@ threshold: 0.1
 base_models:
   1:
     type: "PCEModel"
-    params: {}
+    params:
+      degree: 3
+      poly_type: hermite
   2:
     type: "MLPModel"
     params: {}
 
 leaf_model:
   type: "PCEModel"
-  params: {}
+  params:
+    degree: 3
+    poly_type: hermite
 
 edge_model:
   type: "MLPModel"
@@ -26,7 +30,9 @@ graph:
 models:
   1:
     type: "PCEModel"
-    params: {}
+    params:
+      degree: 3
+      poly_type: hermite
   2:
     type: "MLPModel"
     params: {}
