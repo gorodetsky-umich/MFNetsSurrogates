@@ -249,7 +249,7 @@ def test_auto_mfnet_two_node_no_edge(key):
     d = 3
     base0 = LinearModel(init_linear_params(key, d, d))
     base1 = LinearModel(init_linear_params(key, d, d * 2))
-    x = jax.random.normal(key, (30, d))
+    x = jax.random.normal(key, (100, d))
     y1 = base1.run(x)
     auto = AutoMFNet(sink_node=None)
     auto.fit_structure(
@@ -266,7 +266,7 @@ def test_auto_mfnet_two_node_no_edge(key):
     mfnet = auto.fit_parameters(
         dag, [None, (x, y1)], n_iters=2000, learning_rate=1.0, verbose=False
     )
-    (pred1,) = mfnet.run((1,), x)
+    (pred1,) = mfnet.run((1,), x)    
     err = jnp.linalg.norm(pred1 - y1) / jnp.linalg.norm(y1)
-    #    print("error = ", err)
+    # print("error = ", err)
     assert err < 1e-5
