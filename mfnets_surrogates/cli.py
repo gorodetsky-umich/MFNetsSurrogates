@@ -62,8 +62,13 @@ def _instantiate_model(
     key: jax.random.PRNGKey,
 ) -> Any:
     """Instantiate a model based on the specification."""
-    initializer = MODEL_INITIALIZERS.get(spec.type)
-    if not initializer:
+    # Case-insensitive lookup so "PCEModel" == "pcemodel"
+    initializer = next(
+        (fn for name, fn in MODEL_INITIALIZERS.items()
+         if name.lower() == spec.type.lower()),
+        None,
+    )
+    if initializer is None:
         console.print(f"[bold red]Unknown model type: {spec.type}[/]")
         raise typer.Exit(code=1)
 
