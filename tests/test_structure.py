@@ -266,7 +266,7 @@ def test_auto_mfnet_two_node_no_edge(key):
     mfnet = auto.fit_parameters(
         dag, [None, (x, y1)], n_iters=2000, learning_rate=1.0, verbose=False
     )
-    (pred1,) = mfnet.run((1,), x)    
+    (pred1,) = mfnet.run((1,), x)
     err = jnp.linalg.norm(pred1 - y1) / jnp.linalg.norm(y1)
     # print("error = ", err)
     assert err < 1e-5
