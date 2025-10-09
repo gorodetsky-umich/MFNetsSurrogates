@@ -386,8 +386,8 @@ def run(
 
         edge_tpl = config.edge_model
 
-        def edge_fn(nid, dim, parent_dims):
-            d_in, _ = dim_info[nid]
+        def edge_fn(nid: int, dim: int, parent_dims: list[int]):
+            d_in, _ = dims_seq[nid]
             key_e = jax.random.PRNGKey(2000 + nid)
             return _instantiate_model(
                 edge_tpl, d_in, dim, sum(parent_dims), key_e
