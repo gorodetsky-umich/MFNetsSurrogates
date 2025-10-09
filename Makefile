@@ -70,11 +70,17 @@ run-pce-graph: ## Run an example showing PCE nodes with multiple graphs on MLP t
 	@echo "--> Running PCE graph example..."
 	@python examples/pce_graphs_with_mlp_truth.py
 
-run-cli-example: ## Run the full CLI tool example
+run-cli-example: ## Run the full CLI tool example (fixed graph)
 	@echo "--> Generating data for CLI example..."
 	@python examples/cli_tool/generate_data.py
-	@echo "--> Running CLI tool with example config..."
+	@echo "--> Running CLI tool with fixed-graph config..."
 	mfnets-run run --config examples/cli_tool/config.yml
+
+run-cli-auto: ## Run the CLI tool in two-stage AUTO mode
+	@echo "--> Generating data for Auto-MFNet example..."
+	@python examples/cli_tool/generate_data.py
+	@echo "--> Running CLI tool with Auto-MFNet config..."
+	mfnets-run run --config examples/cli_tool/auto_config.yml
 
 # ==============================================================================
 # CI & Cleanup
