@@ -357,6 +357,7 @@ def run(
             raise typer.Exit(code=1)
 
         base_models = []
+        dims_seq = []
         for node_id in sorted(config.graph["nodes"]):
             spec = config.base_models.get(node_id)
             if not spec:
@@ -367,6 +368,7 @@ def run(
             d_in, d_out = dim_info[node_id]
             key, sub = jax.random.split(key)
             base_models.append(_instantiate_model(spec, d_in, d_out, 0, sub))
+            dims_seq.append((d_in, d_out))
 
         sink_node = max(config.graph["nodes"])
         auto = AutoMFNet(sink_node, alpha=config.alpha, beta=config.beta)
@@ -379,8 +381,8 @@ def run(
 
         leaf_tpl = config.leaf_model
 
-        def leaf_fn(nid, dim):
-            d_in, _ = dim_info[nid]
+        def leaf_fn(nid: int, dim: int):
+            d_in, _ = dims_seq[nid]
             key_l = jax.random.PRNGKey(1000 + nid)
             return _instantiate_model(leaf_tpl, d_in, dim, 0, key_l)
 
