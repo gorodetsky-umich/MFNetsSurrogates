@@ -104,7 +104,7 @@ def _load_training_data(
     all_data = {}
     dim_info = {}
     structure_data = [None] * len(config.graph["nodes"])
-    for i, dataset in enumerate(training_datasets):
+    for _idx, dataset in enumerate(training_datasets):
         data = jnp.load(dataset.data_path)
         all_data[dataset.name] = data
         for node_id in dataset.nodes:
@@ -123,7 +123,7 @@ def _load_training_data(
         "Derived model dimensions from data for nodes: "
         f"{list(dim_info.keys())}"
     )
-    structure_data[i] = (
+    structure_data[_idx] = (
         data[f"x_train_{dataset.nodes[0]}"],
         data[f"y_train_{dataset.nodes[0]}"],
     )

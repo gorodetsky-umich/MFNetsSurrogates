@@ -41,9 +41,10 @@ class Config(BaseModel):
 
     mode: Literal["fixed", "auto"] = Field(
         default="fixed",
-        description='Run-mode selector: "fixed" (default) executes the classic '
-        "single-stage training, whereas ``auto`` triggers the two-stage "
-        "structure-learning pipeline.",
+        description=(
+            'Run-mode selector: "fixed" executes single-stage training, while '
+            '"auto" triggers the two-stage structure-learning pipeline.'
+        ),
     )
     alpha: float = Field(
         1.0,
