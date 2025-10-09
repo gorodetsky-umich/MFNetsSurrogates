@@ -72,22 +72,26 @@ def _instantiate_model(
         console.print(f"[bold red]Unknown model type: {spec.type}[/]")
         raise typer.Exit(code=1)
 
+    # --- build kwargs dynamically ----------------------------------
     kwargs = spec.params.copy()
-    kwargs.update({"d_in": d_in, "d_out": d_out})
+    sig_names = set(inspect.signature(initializer).parameters)
 
+    # add core input/output sizes only if accepted
+    if "d_in" in sig_names:
+        kwargs["d_in"] = d_in
+    if "d_out" in sig_names:
+        kwargs["d_out"] = d_out
+
+    # handle parent dimension for enhancement / scale-shift models
     if d_parent > 0:
-        if "scaleshift" in spec.type.lower():
+        if "scaleshift" in spec.type.lower() and "d_parent" in sig_names:
             kwargs["d_parent"] = d_parent
-        elif "enhancement" in spec.type.lower():
-            kwargs["layer_sizes"][0] = d_in + d_parent
 
-    if "activation" in kwargs:
-        act_str = kwargs.pop("activation")
-        activation_fn = ACTIVATION_FUNCTIONS.get(act_str)
-        if not activation_fn:
-            console.print(f"[bold red]Unknown activation: {act_str}[/]")
-            raise typer.Exit(code=1)
-        kwargs["activation"] = activation_fn
+    # build layer_sizes for MLP-style initialisers
+    if "layer_sizes" in sig_names:
+        hidden = kwargs.pop("hidden", [32, 32])
+        layer_sizes = [d_in + d_parent, *hidden, d_out]
+        kwargs["layer_sizes"] = layer_sizes
 
     return initializer(key=key, **kwargs)
 
