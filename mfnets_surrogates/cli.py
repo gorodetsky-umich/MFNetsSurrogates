@@ -115,7 +115,7 @@ def _load_training_data(
         "Derived model dimensions from data for nodes: "
         f"{list(dim_info.keys())}"
     )
-        structure_data[i] = (data[f"x_train_{dataset.nodes[0]}"], data[f"y_train_{dataset.nodes[0]}"])
+    structure_data[i] = (data[f"x_train_{dataset.nodes[0]}"], data[f"y_train_{dataset.nodes[0]}"])
     return all_data, dim_info, structure_data
 
 
