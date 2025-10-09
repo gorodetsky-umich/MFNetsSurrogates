@@ -38,6 +38,5 @@ training:
 datasets:
   - name: "train_data"
     type: "training"
-    data_path: "path/to/train_data.npz"
+    data_path: "examples/cli_tool/training_data.npz"
     nodes: [1, 2]
-    output_path: "path/to/output.npz"
