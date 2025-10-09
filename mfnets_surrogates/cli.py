@@ -4,7 +4,7 @@ import inspect
 import time
 from collections.abc import Callable
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Optional
 
 import jax
 import jax.numpy as jnp
@@ -16,7 +16,7 @@ from rich.console import Console
 from rich.table import Table
 
 from mfnets_surrogates import net_jax
-from mfnets_surrogates.config import Config, TrainingParams
+from mfnets_surrogates.config import Config, TrainingParams, ModelParams
 from mfnets_surrogates.structure import AutoMFNet
 
 app = typer.Typer(pretty_exceptions_show_locals=False)
@@ -324,6 +324,7 @@ def run(
 ) -> None:
     """Build, train, and run predictions for an MFNets surrogate model."""
     config = _load_and_validate_config(config_path)
+    key = jax.random.PRNGKey(42)
     training_data, dim_info, structure_data = _load_training_data(config)
 
     if config.mode.lower() == "auto":
