@@ -17,6 +17,7 @@ from rich.table import Table
 
 from mfnets_surrogates import net_jax
 from mfnets_surrogates.config import Config, TrainingParams
+from mfnets_surrogates.structure import AutoMFNet
 
 app = typer.Typer(pretty_exceptions_show_locals=False)
 console = Console()
@@ -53,9 +54,38 @@ def _load_and_validate_config(config_path: Path) -> Config:
         raise typer.Exit(code=1) from e
 
 
+def _instantiate_model(
+    spec: ModelParams, d_in: int, d_out: int, d_parent: int, key: jax.random.PRNGKey
+) -> Any:
+    """Instantiate a model based on the specification."""
+    initializer = MODEL_INITIALIZERS.get(spec.type)
+    if not initializer:
+        console.print(f"[bold red]Unknown model type: {spec.type}[/]")
+        raise typer.Exit(code=1)
+
+    kwargs = spec.params.copy()
+    kwargs.update({"d_in": d_in, "d_out": d_out})
+
+    if d_parent > 0:
+        if "scaleshift" in spec.type.lower():
+            kwargs["d_parent"] = d_parent
+        elif "enhancement" in spec.type.lower():
+            kwargs["layer_sizes"][0] = d_in + d_parent
+
+    if "activation" in kwargs:
+        act_str = kwargs.pop("activation")
+        activation_fn = ACTIVATION_FUNCTIONS.get(act_str)
+        if not activation_fn:
+            console.print(f"[bold red]Unknown activation: {act_str}[/]")
+            raise typer.Exit(code=1)
+        kwargs["activation"] = activation_fn
+
+    return initializer(key=key, **kwargs)
+
+
 def _load_training_data(
     config: Config,
-) -> tuple[dict[str, Any], dict[int | str, tuple[int, int]]]:
+) -> tuple[dict[str, Any], dict[int | str, tuple[int, int]], list[Optional[tuple[jnp.ndarray, jnp.ndarray]]]]:
     """Load all training datasets and derive model dimensions."""
     console.print("Loading training data...")
     training_datasets = [d for d in config.datasets if d.type == "training"]
@@ -65,7 +95,8 @@ def _load_training_data(
 
     all_data = {}
     dim_info = {}
-    for dataset in training_datasets:
+    structure_data = [None] * len(config.graph["nodes"])
+    for i, dataset in enumerate(training_datasets):
         data = jnp.load(dataset.data_path)
         all_data[dataset.name] = data
         for node_id in dataset.nodes:
@@ -84,7 +115,8 @@ def _load_training_data(
         "Derived model dimensions from data for nodes: "
         f"{list(dim_info.keys())}"
     )
-    return all_data, dim_info
+        structure_data[i] = (data[f"x_train_{dataset.nodes[0]}"], data[f"y_train_{dataset.nodes[0]}"])
+    return all_data, dim_info, structure_data
 
 
 def _build_mfnet_from_config(
@@ -292,13 +324,53 @@ def run(
 ) -> None:
     """Build, train, and run predictions for an MFNets surrogate model."""
     config = _load_and_validate_config(config_path)
-    training_data, dim_info = _load_training_data(config)
-    mfnet = _build_mfnet_from_config(config, dim_info)
-    trained_mfnet = _train_network(
-        mfnet, training_data, config.training, config
-    )
-    _process_prediction_tasks(trained_mfnet, config)
-    console.print("\n[bold green]CLI tool finished successfully.[/]")
+    training_data, dim_info, structure_data = _load_training_data(config)
+
+    if config.mode.lower() == "auto":
+        if not (config.base_models and config.leaf_model and config.edge_model):
+            console.print("[bold red]Missing required fields for auto mode.[/]")
+            raise typer.Exit(code=1)
+
+        base_models = []
+        for node_id in sorted(config.graph["nodes"]):
+            spec = config.base_models.get(node_id)
+            if not spec:
+                console.print(f"[bold red]Missing model spec for node {node_id}.[/]")
+                raise typer.Exit(code=1)
+            d_in, d_out = dim_info[node_id]
+            key, sub = jax.random.split(key)
+            base_models.append(_instantiate_model(spec, d_in, d_out, 0, sub))
+
+        sink_node = max(config.graph["nodes"])
+        auto = AutoMFNet(sink_node, alpha=config.alpha, beta=config.beta)
+        auto.fit_structure(base_models, structure_data, n_iters=config.training.num_steps, learning_rate=config.training.learning_rate)
+
+        leaf_tpl = config.leaf_model
+        def leaf_fn(nid, dim):
+            d_in, _ = dim_info[nid]
+            key_l = jax.random.PRNGKey(1000 + nid)
+            return _instantiate_model(leaf_tpl, d_in, dim, 0, key_l)
+
+        edge_tpl = config.edge_model
+        def edge_fn(nid, dim, parent_dims):
+            d_in, _ = dim_info[nid]
+            key_e = jax.random.PRNGKey(2000 + nid)
+            return _instantiate_model(edge_tpl, d_in, dim, sum(parent_dims), key_e)
+
+        dag = auto.extract_dag(config.threshold, leaf_fn, edge_fn)
+
+        param_data = [data for data in structure_data if data is not None]
+        mfnet = auto.fit_parameters(dag, param_data, n_iters=config.training.num_steps, learning_rate=config.training.learning_rate)
+
+        _process_prediction_tasks(mfnet, config)
+        console.print("\n[bold green]Auto mode completed successfully.[/]")
+    else:
+        mfnet = _build_mfnet_from_config(config, dim_info)
+        trained_mfnet = _train_network(
+            mfnet, training_data, config.training, config
+        )
+        _process_prediction_tasks(trained_mfnet, config)
+        console.print("\n[bold green]CLI tool finished successfully.[/]")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,43 @@
+mode: auto
+alpha: 1.0
+beta: 1.0
+threshold: 0.1
+
+base_models:
+  1:
+    type: "PCEModel"
+    params: {}
+  2:
+    type: "MLPModel"
+    params: {}
+
+leaf_model:
+  type: "PCEModel"
+  params: {}
+
+edge_model:
+  type: "MLPModel"
+  params: {}
+
+graph:
+  nodes: [1, 2]
+  edges: [[1, 2]]
+
+models:
+  1:
+    type: "PCEModel"
+    params: {}
+  2:
+    type: "MLPModel"
+    params: {}
+
+training:
+  learning_rate: 0.001
+  num_steps: 5000
+
+datasets:
+  - name: "train_data"
+    type: "training"
+    data_path: "path/to/train_data.npz"
+    nodes: [1, 2]
+    output_path: "path/to/output.npz"

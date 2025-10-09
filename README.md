@@ -37,7 +37,7 @@ pip install -e .
 
 ## **Quick Start Example**
 
-Here is a complete example of how to define, train, and evaluate a simple two-fidelity hierarchical model (1 \-\> 2).  
+Here is a complete example of how to define, train, and evaluate a simple two-fidelity hierarchical model (1 \-\> 2). You can toggle between "fixed" and "auto" modes using the `mode` field in the configuration.  
 
 ```
 import jax
