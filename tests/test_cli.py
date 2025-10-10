@@ -170,7 +170,7 @@ datasets:
     )
 
 
-@patch("mfnets_surrogates.structure.AutoMFNet") # Corrected patch target
+@patch("mfnets_surrogates.structure.AutoMFNet")  # Corrected patch target
 def test_cli_run_auto_mode_sink_node_inference(
     mock_auto_mfnet_cls, minimal_auto_config_path: Path
 ):
