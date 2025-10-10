@@ -337,6 +337,48 @@ def test_structure_learner_sparsity_penalty(key):
     npt.assert_allclose(W, 0.0, atol=1e-2)
 
 
+def test_structure_learner_acyclicity_penalty(key):
+    """Test that a high alpha (acyclicity) penalty suppresses cycles."""
+    k0, k1, k_data = jax.random.split(key, 3)
+    d_in, d_out = 1, 1
+
+    # Create data suggesting a cyclic relationship: 0->1 and 1->0
+    x_train = jax.random.normal(k_data, (200, d_in))
+    y0_base = x_train**2
+    y1_base = jnp.sin(x_train)
+    y0 = y0_base + 0.8 * y1_base  # y0 depends on y1_base
+    y1 = y1_base + 0.8 * y0_base  # y1 depends on y0_base
+    train_data = {0: (x_train, y0), 1: (x_train, y1)}
+
+    m0 = init_linear_model(k0, d_in, d_out)
+    m1 = init_linear_model(k1, d_in, d_out)
+    base_models = [m0, m1]
+    node_ids = [0, 1]
+
+    # 1. Train with low alpha, which should learn a cyclic graph
+    learner_cyclic = MFNetStructureLearner(
+        node_ids=node_ids, base_models=base_models, alpha=0.0, beta=0.01
+    )
+    learner_cyclic = learner_cyclic.fit(
+        train_data, n_iters=5000, learning_rate=1e-2
+    )
+    W_cyclic = learner_cyclic.get_weights()
+    assert W_cyclic[0, 1] > 0.1 and W_cyclic[1, 0] > 0.1
+
+    # 2. Train with a very high alpha, which should prevent a cycle
+    learner_acyclic = MFNetStructureLearner(
+        node_ids=node_ids, base_models=base_models, alpha=10.0, beta=0.01
+    )
+    learner_acyclic = learner_acyclic.fit(
+        train_data, n_iters=5000, learning_rate=1e-2
+    )
+    W_acyclic = learner_acyclic.get_weights()
+    # Assert that at least one of the potential cyclic edges was suppressed
+    assert jnp.allclose(W_acyclic[0, 1], 0.0, atol=1e-2) or jnp.allclose(
+        W_acyclic[1, 0], 0.0, atol=1e-2
+    )
+
+
 # ----------------------------------------------------------------------
 # Tests for AutoMFNet end-to-end pipeline
 
