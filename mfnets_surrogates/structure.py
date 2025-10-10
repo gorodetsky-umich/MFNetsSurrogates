@@ -136,10 +136,20 @@ class MFNetStructureLearner:
         return inst
 
     def run(self, x_input: jnp.ndarray) -> jnp.ndarray:
-        """
-        Forward pass: solve (I - W^T) F = Δ.
+        """Perform the forward pass for a given input.
 
-        Each scalar W_ij is applied to every coordinate of δ_i(x).
+        This method computes the full output `F` for all nodes in the graph
+        by solving the linear system `(I - W^T)F = Δ`, where `Δ` is the
+        stacked output of the base models.
+
+        Args:
+            x_input: The primary input array with shape `(batch, d_in)`.
+
+        Returns
+        -------
+            An array representing the full outputs `F` for all nodes, with
+            shape `(n_nodes, batch, max_dim)`. If `n_nodes` is 1, the shape
+            is `(batch, d_out)`.
         """
         # Shortcut for single node: just return its raw output
         if self.n_nodes == 1:
@@ -178,10 +188,7 @@ class MFNetStructureLearner:
         return cast(jnp.ndarray, F)
 
     def structure_learning_loss(
-        self,  # type: ignore
-        train_data: Mapping[  # type: ignore
-            Any, tuple[jnp.ndarray, jnp.ndarray]
-        ],  # New: train_data is now a dict
+        self, train_data: Mapping[Any, tuple[jnp.ndarray, jnp.ndarray]]
     ) -> jnp.ndarray:
         """Compute loss over datasets: data-fit, DAG & sparsity penalties."""
         # Accumulate MSE only for supervised nodes
@@ -226,9 +233,7 @@ class MFNetStructureLearner:
 
     def fit(
         self,
-        train_data: Mapping[
-            Any, tuple[jnp.ndarray, jnp.ndarray]
-        ],  # New: train_data is now a dict
+        train_data: Mapping[Any, tuple[jnp.ndarray, jnp.ndarray]],
         n_iters: int = 1000,
         learning_rate: float = 1e-3,
     ) -> "MFNetStructureLearner":

@@ -85,12 +85,10 @@ def _instantiate_model(
             any.
         key: A JAX PRNGKey for model initialization.
 
-    Returns
-    -------
+    Returns:
         An instantiated Model object.
 
-    Raises
-    ------
+    Raises:
         typer.Exit: If an unknown model type is specified.
     """
     # Case-insensitive lookup so "PCEModel" == "pcemodel"
@@ -146,8 +144,7 @@ def _load_training_data(
     Args:
         config: The parsed configuration object.
 
-    Returns
-    -------
+    Returns:
         A tuple containing:
         - all_data: A dictionary mapping dataset names to raw loaded data.
         - dim_info: A dictionary mapping node IDs to (input_dim, output_dim).
@@ -155,8 +152,7 @@ def _load_training_data(
                           data, used specifically for structure learning.
         - config_node_ids: A sequence of node IDs as ordered in the config.
 
-    Raises
-    ------
+    Raises:
         typer.Exit: If no training datasets are found, or if data keys are
                     missing from the NPZ files.
 

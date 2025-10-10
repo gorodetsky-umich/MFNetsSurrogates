@@ -156,7 +156,18 @@ class MFNetJax:
     def run(
         self, target_nodes: tuple[Any, ...], xinput: jnp.ndarray
     ) -> tuple[jnp.ndarray, ...]:
-        """Evaluate the graph for the specified target nodes."""
+        """Evaluate the graph for the specified target nodes.
+
+        Args:
+            target_nodes: A tuple of node identifiers for which to compute the
+                output.
+            xinput: The primary input array with shape `(batch, d_in)`.
+
+        Returns
+        -------
+            A tuple of output arrays, one for each node in `target_nodes`. Each
+            output has shape `(batch, d_out_node)`.
+        """
         needed: set[Any] = set()
         for t in target_nodes:
             needed.update(self.ancestors[t])
@@ -199,7 +210,7 @@ class MFNetJax:
 
         Returns
         -------
-            The trained MFNetJax instance.
+            The trained `MFNetJax` instance (self).
         """
         target_nodes = tuple(
             self.eval_order[i]
@@ -348,7 +359,15 @@ class LinearModel(Model):
         return instance
 
     def run(self, xin: jnp.ndarray) -> jnp.ndarray:
-        """Evaluate the model on a batch of input data."""
+        """Run the linear model forward pass.
+
+        Args:
+            xin: Input array with shape `(batch, d_in)`.
+
+        Returns
+        -------
+            Output array with shape `(batch, d_out)`.
+        """
         return xin @ self.params.weight.T + self.params.bias
 
     def output_dim(self) -> int:
@@ -379,7 +398,15 @@ class LinearModel2D(Model):
         return instance
 
     def run(self, xin: jnp.ndarray) -> jnp.ndarray:
-        """Evaluate the model on a batch of input data."""
+        """Run the linear model forward pass for a 2D matrix output.
+
+        Args:
+            xin: Input array with shape `(batch, d_in)`.
+
+        Returns
+        -------
+            Output array with shape `(batch, d_out1, d_out2)`.
+        """
         return (
             jnp.einsum("opi,si->sop", self.params.weight, xin)
             + self.params.bias
@@ -420,7 +447,17 @@ class LinearScaleShiftModel(Model):
         self.node_model.set_optimizable(optimizable)
 
     def run(self, xin: jnp.ndarray, parent_val: jnp.ndarray) -> jnp.ndarray:
-        """Evaluate the model: y = scale(x) @ parent_val + shift(x)."""
+        """Compute a scale-and-shift correction.
+
+        Args:
+            xin: The primary input array.
+            parent_val: The output from the parent node.
+
+        Returns
+        -------
+            The enhanced output array, computed as
+            `scale(x) @ parent_val + shift(x)`.
+        """
         edge_val = self.edge_model.run(xin)
         node_val = self.node_model.run(xin)
         return jnp.einsum("sop,sp->so", edge_val, parent_val) + node_val
@@ -463,7 +500,15 @@ class MLPModel(Model):
         return instance
 
     def run(self, xin: jnp.ndarray) -> jnp.ndarray:
-        """Evaluate the MLP on a batch of input data."""
+        """Run the MLP forward pass.
+
+        Args:
+            xin: Input array with shape `(batch, d_in)`.
+
+        Returns
+        -------
+            Output array with shape `(batch, d_out)`.
+        """
         x = xin
         for i, layer_params in enumerate(self.params):
             x = x @ layer_params.weight.T + layer_params.bias
@@ -505,7 +550,16 @@ class MLPEnhancementModel(Model):
         self.mlp_model.set_optimizable(optimizable)
 
     def run(self, xin: jnp.ndarray, parent_val: jnp.ndarray) -> jnp.ndarray:
-        """Evaluate the model on a batch of inputs and parent values."""
+        """Enhance a low-fidelity input by concatenating parent outputs.
+
+        Args:
+            xin: The primary input array.
+            parent_val: The output from the parent node(s).
+
+        Returns
+        -------
+            The enhanced output array from the internal MLP.
+        """
         combined_input = jnp.concatenate([xin, parent_val], axis=-1)
         return self.mlp_model.run(combined_input)
 
@@ -636,7 +690,15 @@ class PCEModel(Model):
         return instance
 
     def run(self, xin: jnp.ndarray) -> jnp.ndarray:
-        """Evaluate the PCE model on a batch of inputs."""
+        """Run the PCE model forward pass.
+
+        Args:
+            xin: Input array with shape `(batch, d_in)`.
+
+        Returns
+        -------
+            Output array with shape `(batch, d_out)`.
+        """
         basis_matrix = build_poly_basis(
             xin, self.multi_indices, self.poly_type, self.degree
         )
@@ -692,7 +754,15 @@ class PCEModel2D(Model):
         return instance
 
     def run(self, xin: jnp.ndarray) -> jnp.ndarray:
-        """Evaluate the PCE model on a batch of inputs."""
+        """Run the PCE model forward pass for a 2D matrix output.
+
+        Args:
+            xin: Input array with shape `(batch, d_in)`.
+
+        Returns
+        -------
+            Output array with shape `(batch, d_out1, d_out2)`.
+        """
         basis_matrix = build_poly_basis(
             xin, self.multi_indices, self.poly_type, self.degree
         )
@@ -732,7 +802,16 @@ class PCEAdditiveModel(Model):
         self.node_model.set_optimizable(optimizable)
 
     def run(self, xin: jnp.ndarray, parent_val: jnp.ndarray) -> jnp.ndarray:
-        """Evaluate the model on a batch of inputs and parent values."""
+        """Compute an additive enhancement.
+
+        Args:
+            xin: The primary input array.
+            parent_val: The output from the parent node.
+
+        Returns
+        -------
+            The enhanced output array, computed as `edge(x, parent) + node(x)`.
+        """
         edge_input = jnp.concatenate([xin, parent_val], axis=-1)
         edge_val = self.edge_model.run(edge_input)
         node_val = self.node_model.run(xin)
@@ -775,7 +854,16 @@ class PCEScaleShiftModel(Model):
         self.node_model.set_optimizable(optimizable)
 
     def run(self, xin: jnp.ndarray, parent_val: jnp.ndarray) -> jnp.ndarray:
-        """Evaluate the model: y = PCE_edge(x) @ parent_val + PCE_node(x)."""
+        """Compute an enhancement using PCE for both scale and shift.
+
+        Args:
+            xin: The primary input array.
+            parent_val: The output from the parent node.
+
+        Returns
+        -------
+            The enhanced output, computed as `scale(x) @ parent_val + shift(x)`.
+        """
         edge_val = self.edge_model.run(xin)
         node_val = self.node_model.run(xin)
         correction = jnp.einsum("sop,sp->so", edge_val, parent_val)
