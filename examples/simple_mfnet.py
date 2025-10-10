@@ -6,7 +6,6 @@ import networkx as nx
 
 from mfnets_surrogates.net_jax import (
     MFNetJax,
-    MLPEnhancementModel,
     init_mlp_enhancement_model,
     init_mlp_model,
 )
