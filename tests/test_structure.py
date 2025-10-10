@@ -357,7 +357,11 @@ def test_structure_learner_acyclicity_penalty(key):
 
     # 1. Train with low alpha, which should learn a cyclic graph
     learner_cyclic = MFNetStructureLearner(
-        node_ids=node_ids, base_models=base_models, alpha=1e0, beta=0.01
+        node_ids=node_ids,
+        base_models=base_models,
+        alpha=1e0,
+        beta=0.01,
+        acyclicity_penalty_type="inv",
     )
     print("pre fit 1")
     learner_cyclic = learner_cyclic.fit(
@@ -369,7 +373,11 @@ def test_structure_learner_acyclicity_penalty(key):
 
     # 2. Train with a very high alpha, which should prevent a cycle
     learner_acyclic = MFNetStructureLearner(
-        node_ids=node_ids, base_models=base_models, alpha=10.0, beta=0.01
+        node_ids=node_ids,
+        base_models=base_models,
+        alpha=10.0,
+        beta=0.01,
+        acyclicity_penalty_type="inv",
     )
     learner_acyclic = learner_acyclic.fit(
         train_data, n_iters=500, learning_rate=1e-3

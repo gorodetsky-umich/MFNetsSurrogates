@@ -31,6 +31,7 @@ class MFNetStructureLearner:
         # Now accepts external node ID
         alpha: float = 1.0,
         beta: float = 1.0,
+        acyclicity_penalty_type: str = "expm",  # New parameter
     ) -> None:
         """Initialize the structure learning engine.
 
@@ -46,10 +47,17 @@ class MFNetStructureLearner:
                        infer one.
             alpha: Weight for acyclicity penalty.
             beta: Weight for L1 sparsity penalty.
+            acyclicity_penalty_type: Specifies the method for calculating the
+                                     acyclicity penalty. Options: "expm" (matrix
+                                     exponential) or "inv" (matrix inverse).
         """
         if len(node_ids) != len(base_models):
             raise ValueError(
                 "node_ids and base_models must have the same length."
+            )
+        if acyclicity_penalty_type not in ["expm", "inv"]:
+            raise ValueError(
+                "acyclicity_penalty_type must be either 'expm' or 'inv'."
             )
 
         self.node_ids = tuple(
@@ -79,6 +87,7 @@ class MFNetStructureLearner:
         )  # Ensure it's a list for internal use
         self.alpha = alpha
         self.beta = beta
+        self.acyclicity_penalty_type = acyclicity_penalty_type  # Store new parameter
 
     def tree_flatten(self) -> tuple[list[jnp.ndarray], tuple]:
         """Flatten parameters (W and base_models) for JAX transformations."""
@@ -97,6 +106,7 @@ class MFNetStructureLearner:
             treedefs,
             self.alpha,
             self.beta,
+            self.acyclicity_penalty_type,  # Add new parameter to aux_data
         )
         return leaves, aux_data
 
@@ -105,9 +115,15 @@ class MFNetStructureLearner:
         cls, aux_data: tuple, children: list[jnp.ndarray]
     ) -> "MFNetStructureLearner":
         """Reconstruct instance from leaves and static data."""
-        node_ids, n_nodes, constraint_mask, treedefs, alpha, beta = (
-            aux_data  # Unpack node_ids
-        )
+        (
+            node_ids,
+            n_nodes,
+            constraint_mask,
+            treedefs,
+            alpha,
+            beta,
+            acyclicity_penalty_type,  # Unpack new parameter
+        ) = aux_data  # Unpack node_ids
         # First child is adjacency_matrix
         adj_matrix = children[0]
         # Next children correspond to base_models
@@ -130,6 +146,7 @@ class MFNetStructureLearner:
             sink_node=None,
             alpha=alpha,
             beta=beta,
+            acyclicity_penalty_type=acyclicity_penalty_type,  # Pass new parameter to constructor
         )
         inst.adjacency_matrix = adj_matrix
         inst.constraint_mask = constraint_mask
@@ -221,11 +238,23 @@ class MFNetStructureLearner:
 
         if num_supervised_nodes > 0:
             mse_total /= num_supervised_nodes
+        
         # Acyclicity penalty
         W = self.adjacency_matrix * self.constraint_mask
-        H = W * W
-        expm = jax.scipy.linalg.expm(H)
-        h_pen = jnp.trace(expm) - self.n_nodes
+        H = W * W 
+
+        if self.acyclicity_penalty_type == "expm":
+            expm = jax.scipy.linalg.expm(H)
+            h_pen = jnp.trace(expm) - self.n_nodes
+        elif self.acyclicity_penalty_type == "inv":
+            penalty_matrix = jnp.linalg.inv(jnp.eye(self.n_nodes) + H)
+            h_pen = jnp.trace(penalty_matrix) - self.n_nodes
+        else: # pragma: no cover
+            # This should ideally be caught in __init__, but as a safeguard
+            raise ValueError(
+                f"Unknown acyclicity_penalty_type: {self.acyclicity_penalty_type}"
+            )
+        
         # Sparsity penalty
         l1 = jnp.sum(jnp.abs(W))
 
@@ -322,6 +351,7 @@ class AutoMFNet:
         sink_node: Any | None = None,  # New: now accepts external node ID
         alpha: float = 1.0,
         beta: float = 1.0,
+        acyclicity_penalty_type: str = "expm",  # New parameter
     ):
         """AutoMFNet orchestrator.
 
@@ -329,10 +359,15 @@ class AutoMFNet:
             sink_node: index of node to freeze as sink (no outgoing edges).
             alpha: weight for acyclicity penalty.
             beta: weight for sparsity penalty.
+            acyclicity_penalty_type: Specifies the method for calculating the
+                                     acyclicity penalty for structure learning.
+                                     Options: "expm" (matrix exponential) or
+                                     "inv" (matrix inverse).
         """
         self.sink_node = sink_node
         self.alpha = alpha
         self.beta = beta
+        self.acyclicity_penalty_type = acyclicity_penalty_type  # Store new parameter
 
         self.node_ids: Sequence[Any] | None = (
             None  # Store the ordered external node IDs
@@ -398,6 +433,7 @@ class AutoMFNet:
             sink_node=primary_sink_id,  # Pass the external sink node ID
             alpha=self.alpha,
             beta=self.beta,
+            acyclicity_penalty_type=self.acyclicity_penalty_type,  # Pass new parameter
         )
         self.learner = learner.fit(
             structure_data, n_iters=n_iters, learning_rate=learning_rate
