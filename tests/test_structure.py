@@ -10,8 +10,8 @@ from mfnets_surrogates import (
     LinearModel,
     LinearParams,
     MFNetStructureLearner,
-    Model, # Added import for Mock
-    init_linear_model, # Added import for convenience functions
+    Model,  # Added import for Mock
+    init_linear_model,  # Added import for convenience functions
 )
 
 
@@ -26,7 +26,9 @@ def test_tree_flatten_unflatten_roundtrip(key):
     params1 = LinearParams(jnp.ones((3, 2)), jnp.ones(3))
     m0 = LinearModel(params0)
     m1 = LinearModel(params1)
-    learner = MFNetStructureLearner(node_ids=[0, 1], base_models=[m0, m1], sink_node=1, alpha=0.5, beta=2.0)
+    learner = MFNetStructureLearner(
+        node_ids=[0, 1], base_models=[m0, m1], sink_node=1, alpha=0.5, beta=2.0
+    )
 
     leaves, aux = tree_util.tree_flatten(learner)
     rebuilt = tree_util.tree_unflatten(aux, leaves)
@@ -49,7 +51,9 @@ def test_single_node_forward_identity(key):
     weight = jnp.eye(2) * 2.0
     bias = jnp.ones(2) * 3.0
     delta = LinearModel(LinearParams(weight, bias))
-    learner = MFNetStructureLearner(node_ids=[0], base_models=[delta], sink_node=None)
+    learner = MFNetStructureLearner(
+        node_ids=[0], base_models=[delta], sink_node=None
+    )
 
     # With W=0, F == Δ
     x = jax.random.normal(key, (4, 2))
@@ -64,7 +68,9 @@ def test_sink_node_mask_enforced(key):
     params1 = LinearParams(jnp.zeros((1, 1)), jnp.zeros(1))
     m0 = LinearModel(params0)
     m1 = LinearModel(params1)
-    learner = MFNetStructureLearner(node_ids=[0, 1], base_models=[m0, m1], sink_node=0)
+    learner = MFNetStructureLearner(
+        node_ids=[0, 1], base_models=[m0, m1], sink_node=0
+    )
 
     # Mask should zero out row 0
     mask = learner.constraint_mask
@@ -114,8 +120,12 @@ def test_structure_learner_single_node_fit(key):
     assert len(dag.edges) == 0
     # Check that the model is an instance of LinearModel and its parameters are close
     assert isinstance(dag.nodes[0]["func"], LinearModel)
-    npt.assert_allclose(dag.nodes[0]["func"].params.w, delta.params.w, atol=1e-6)
-    npt.assert_allclose(dag.nodes[0]["func"].params.b, delta.params.b, atol=1e-6)
+    npt.assert_allclose(
+        dag.nodes[0]["func"].params.w, delta.params.w, atol=1e-6
+    )
+    npt.assert_allclose(
+        dag.nodes[0]["func"].params.b, delta.params.b, atol=1e-6
+    )
 
 
 def test_structure_learner_partial_supervision(key):
@@ -201,9 +211,7 @@ def test_structure_learner_recovers_known_dag(key):
     # Check the learned adjacency matrix.
     # We expect W[0,1] and W[1,2] to be strong, W[0,2] weaker, and others small.
     # Node 2 is sink, so W[2,:] should be near zero after mask.
-    npt.assert_array_less(
-        learner.adjacency_matrix[2, :], 1e-2
-    )  # 2 is sink
+    npt.assert_array_less(learner.adjacency_matrix[2, :], 1e-2)  # 2 is sink
 
     # Check recovered DAG
     dag = learner.to_graph(
@@ -217,7 +225,9 @@ def test_structure_learner_recovers_known_dag(key):
     assert not dag.has_edge(1, 0)
     assert not dag.has_edge(2, 0)
     assert not dag.has_edge(2, 1)
-    assert isinstance(dag.nodes[0]["func"], Model) # Check that base models are attached
+    assert isinstance(
+        dag.nodes[0]["func"], Model
+    )  # Check that base models are attached
 
 
 # ----------------------------------------------------------------------
