@@ -118,7 +118,9 @@ def _load_training_data(
     dim_info = {}
     # structure_data will now map external node IDs to (x, y) tuples
     structure_data: dict[Any, tuple[jnp.ndarray, jnp.ndarray]] = {}
-    config_node_ids = tuple(config.graph["nodes"]) # Capture the canonical order of nodes
+    config_node_ids = tuple(
+        config.graph["nodes"]
+    )  # Capture the canonical order of nodes
 
     for dataset in training_datasets:
         data = jnp.load(dataset.data_path)
@@ -136,7 +138,9 @@ def _load_training_data(
             d_out = data[y_key].shape[1]
             dim_info[node_id] = (d_in, d_out)
             # Store data for structure learning using the external node_id directly
-            if node_id in config_node_ids: # Only store if part of the defined graph
+            if (
+                node_id in config_node_ids
+            ):  # Only store if part of the defined graph
                 structure_data[node_id] = (data[x_key], data[y_key])
             else:
                 console.print(
@@ -363,7 +367,9 @@ def run(
     """Build, train, and run predictions for an MFNets surrogate model."""
     config = _load_and_validate_config(config_path)
     key = jax.random.PRNGKey(42)
-    training_data, dim_info, structure_data, config_node_ids = _load_training_data(config)
+    training_data, dim_info, structure_data, config_node_ids = (
+        _load_training_data(config)
+    )
 
     if config.mode.lower() == "auto":
         if not (
@@ -374,8 +380,10 @@ def run(
             )
             raise typer.Exit(code=1)
 
-        base_models_for_learner: dict[Any, Model] = {} # Store models by their external ID
-        
+        base_models_for_learner: dict[
+            Any, Model
+        ] = {}  # Store models by their external ID
+
         # We now iterate over config_node_ids (which is already ordered from config.graph["nodes"])
         for node_id_ext in config_node_ids:
             spec = config.base_models.get(node_id_ext)
@@ -385,7 +393,9 @@ def run(
                 )
                 raise typer.Exit(code=1)
             if node_id_ext not in dim_info:
-                console.print(f"[bold red]Dimensions for node {node_id_ext} not found in training data.[/]")
+                console.print(
+                    f"[bold red]Dimensions for node {node_id_ext} not found in training data.[/]"
+                )
                 raise typer.Exit(code=1)
             d_in, d_out = dim_info[node_id_ext]
             key, sub = jax.random.split(key)
@@ -402,8 +412,8 @@ def run(
             sink_node=config.sink_node, alpha=config.alpha, beta=config.beta
         )
         auto.fit_structure(
-            node_ids=config_node_ids, # Pass the ordered list of node IDs
-            base_models=base_models_for_learner, # Pass the dict of models
+            node_ids=config_node_ids,  # Pass the ordered list of node IDs
+            base_models=base_models_for_learner,  # Pass the dict of models
             structure_data=structure_data,  # This is now correctly indexed
             n_iters=config.training.num_steps,
             learning_rate=config.training.learning_rate,
@@ -411,22 +421,36 @@ def run(
 
         leaf_tpl = config.leaf_model
 
-        def leaf_fn(nid: Any, dim: int): # nid is now Any, the external ID
+        def leaf_fn(nid: Any, dim: int):  # nid is now Any, the external ID
             if nid not in dim_info:
-                console.print(f"[bold red]Dimensions for node {nid} not found for leaf_fn.[/]")
+                console.print(
+                    f"[bold red]Dimensions for node {nid} not found for leaf_fn.[/]"
+                )
                 raise typer.Exit(code=1)
-            d_in, _ = dim_info[nid] # Lookup dimensions directly using external nid
-            key_l = jax.random.PRNGKey(1000 + hash(nid) % (2**31 - 1)) # Use hash for non-int nid
+            d_in, _ = dim_info[
+                nid
+            ]  # Lookup dimensions directly using external nid
+            key_l = jax.random.PRNGKey(
+                1000 + hash(nid) % (2**31 - 1)
+            )  # Use hash for non-int nid
             return _instantiate_model(leaf_tpl, d_in, dim, 0, key_l)
 
         edge_tpl = config.edge_model
 
-        def edge_fn(nid: Any, dim: int, parent_dims: list[int]): # nid is now Any
+        def edge_fn(
+            nid: Any, dim: int, parent_dims: list[int]
+        ):  # nid is now Any
             if nid not in dim_info:
-                console.print(f"[bold red]Dimensions for node {nid} not found for edge_fn.[/]")
+                console.print(
+                    f"[bold red]Dimensions for node {nid} not found for edge_fn.[/]"
+                )
                 raise typer.Exit(code=1)
-            d_in, _ = dim_info[nid] # Lookup dimensions directly using external nid
-            key_e = jax.random.PRNGKey(2000 + hash(nid) % (2**31 - 1)) # Use hash for non-int nid
+            d_in, _ = dim_info[
+                nid
+            ]  # Lookup dimensions directly using external nid
+            key_e = jax.random.PRNGKey(
+                2000 + hash(nid) % (2**31 - 1)
+            )  # Use hash for non-int nid
             return _instantiate_model(
                 edge_tpl, d_in, dim, sum(parent_dims), key_e
             )
@@ -436,7 +460,7 @@ def run(
         # param_data for fit_parameters is now the structure_data dictionary directly
         mfnet = auto.fit_parameters(
             dag=dag,
-            param_data=structure_data, # Pass the dictionary directly
+            param_data=structure_data,  # Pass the dictionary directly
             n_iters=config.training.num_steps,
             learning_rate=config.training.learning_rate,
         )
