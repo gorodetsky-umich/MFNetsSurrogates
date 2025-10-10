@@ -48,8 +48,8 @@ class MFNetStructureLearner:
             alpha: Weight for acyclicity penalty.
             beta: Weight for L1 sparsity penalty.
             acyclicity_penalty_type: Specifies the method for calculating the
-                                     acyclicity penalty. Options: "expm" (matrix
-                                     exponential) or "inv" (matrix inverse).
+                acyclicity penalty. Options: "expm" (matrix exponential) or
+                "inv" (matrix inverse).
         """
         if len(node_ids) != len(base_models):
             raise ValueError(
@@ -148,7 +148,8 @@ class MFNetStructureLearner:
             sink_node=None,
             alpha=alpha,
             beta=beta,
-            acyclicity_penalty_type=acyclicity_penalty_type,  # Pass new parameter to constructor
+            # Pass new parameter to constructor
+            acyclicity_penalty_type=acyclicity_penalty_type,
         )
         inst.adjacency_matrix = adj_matrix
         inst.constraint_mask = constraint_mask
@@ -254,7 +255,8 @@ class MFNetStructureLearner:
         else:  # pragma: no cover
             # This should ideally be caught in __init__, but as a safeguard
             raise ValueError(
-                f"Unknown acyclicity_penalty_type: {self.acyclicity_penalty_type}"
+                "Unknown acyclicity_penalty_type: "
+                f"{self.acyclicity_penalty_type}"
             )
 
         # Sparsity penalty
@@ -437,7 +439,8 @@ class AutoMFNet:
             sink_node=primary_sink_id,  # Pass the external sink node ID
             alpha=self.alpha,
             beta=self.beta,
-            acyclicity_penalty_type=self.acyclicity_penalty_type,  # Pass new parameter
+            # Pass new parameter
+            acyclicity_penalty_type=self.acyclicity_penalty_type,
         )
         self.learner = learner.fit(
             structure_data, n_iters=n_iters, learning_rate=learning_rate
