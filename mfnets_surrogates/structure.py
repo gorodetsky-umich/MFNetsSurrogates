@@ -360,7 +360,8 @@ class AutoMFNet:
             n_iters: Number of optimization iterations for structure learning.
             learning_rate: Learning rate for the optimizer.
 
-        Returns:
+        Returns
+        -------
             The trained MFNetStructureLearner instance.
         """
         self.node_ids = node_ids  # Store the canonical node order
@@ -414,7 +415,8 @@ class AutoMFNet:
             edge_model_fn: A factory function `edge_model_fn(node_id, node_dim, parent_dims) -> Model`
                            to instantiate models for nodes that have parents in the DAG.
 
-        Returns:
+        Returns
+        -------
             A NetworkX DiGraph representing the extracted DAG with instantiated
             leaf and edge models.
         """
@@ -475,7 +477,8 @@ class AutoMFNet:
             verbose: If True, display a progress bar.
             log_every: Interval at which to log the loss.
 
-        Returns:
+        Returns
+        -------
             The trained MFNetJax instance.
         """
         # Need to convert param_data dict to a list ordered by dag nodes for
