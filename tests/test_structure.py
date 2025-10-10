@@ -356,7 +356,11 @@ def test_auto_mfnet_single_node_pipeline(key):
     )  # Should now be a leaf model
 
     mfnet = auto.fit_parameters(
-        dag, param_data, n_iters=1000, learning_rate=1.0, verbose=False  # Increased iterations
+        dag,
+        param_data,
+        n_iters=1000,
+        learning_rate=1.0,
+        verbose=False,  # Increased iterations
     )
     (pred,) = mfnet.run((0,), x)
     npt.assert_allclose(pred, y, atol=1e-5)
