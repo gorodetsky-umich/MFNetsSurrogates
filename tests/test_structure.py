@@ -178,7 +178,7 @@ def test_structure_learner_recovers_known_dag(key):
     k0, k1, k2, k_data = jax.random.split(key, 4)
     n_nodes, d_in, d_out = 3, 5, 1
     # Build base linear models δ_j(x) = x @ (c_j I) with c_j=1,2,3
-    x_train = jax.random.normal(k_data, (2000, d_in))
+    x_train = jax.random.normal(k_data, (5000, d_in)) # Increased data size
     model0 = init_linear_model(k0, d_in, d_out)
     model1 = init_linear_model(k1, d_in, d_out)
     model2 = init_linear_model(k2, d_in, d_out)
