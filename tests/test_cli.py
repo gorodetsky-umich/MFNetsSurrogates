@@ -1,12 +1,8 @@
-import os
 from pathlib import Path
 from unittest.mock import patch
 
-import jax
-import jax.numpy as jnp
 import numpy as np
 import pytest
-import typer
 from typer.testing import CliRunner
 
 from mfnets_surrogates.cli import app
@@ -159,8 +155,13 @@ datasets:
     config_path.write_text(config_content)
 
     result = runner.invoke(app, ["run", "--config", str(config_path)])
-    assert result.exit_code != 0 # It will exit because of node 3's data not being handled by the fixed graph
-    assert "Warning: Training data found for node ID 3 but it's not listed in config.graph['nodes']" in result.stdout
+    assert (
+        result.exit_code != 0
+    )  # It will exit because of node 3's data not being handled by the fixed graph
+    assert (
+        "Warning: Training data found for node ID 3 but it's not listed in config.graph['nodes']"
+        in result.stdout
+    )
 
 
 @patch("mfnets_surrogates.cli.AutoMFNet")
