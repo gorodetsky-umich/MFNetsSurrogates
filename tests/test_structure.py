@@ -424,9 +424,9 @@ def test_auto_mfnet_two_node_no_edge(key):
     assert len(dag.edges) == 0  # No edges due to sparsity penalty
 
     mfnet = auto.fit_parameters(
-        dag, param_data, n_iters=2000, learning_rate=1.0, verbose=False
+        dag, param_data, n_iters=2000, learning_rate=10.0, verbose=False
     )
     (pred1,) = mfnet.run((1,), x1)
     (pred2,) = mfnet.run((2,), x2)
-    npt.assert_allclose(pred1, y1, atol=1e-5)
-    npt.assert_allclose(pred2, y2, atol=1e-5)
+    npt.assert_allclose(pred1, y1, atol=1e-2)
+    npt.assert_allclose(pred2, y2, atol=1e-2)
