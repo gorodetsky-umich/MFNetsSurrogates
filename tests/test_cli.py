@@ -106,7 +106,8 @@ datasets: []
 
     result = runner.invoke(app, ["run", "--config", str(config_path)])
     assert result.exit_code != 0
-    # Expected behavior now: _load_training_data is called first, finds no datasets.
+    # Expected behavior now: _load_training_data is called first,
+    # finds no datasets.
     assert "No training datasets found in config." in result.stdout
 
 
