@@ -148,8 +148,8 @@ class MFNetStructureLearner:
 
         # 1) Compute each base-model output δ_j(x) with shape (batch, d_j)
         outputs = [m.run(x_input) for m in self.base_models]
-        dims = [o.shape[-1] for o in outputs] # type: ignore
-        max_dim = max(dims) # type: ignore
+        dims = [o.shape[-1] for o in outputs]  # type: ignore
+        max_dim = max(dims)  # type: ignore
 
         # 2) Pad each δ_j to width max_dim along last axis
         padded = [
@@ -176,8 +176,8 @@ class MFNetStructureLearner:
         return cast(jnp.ndarray, F)
 
     def structure_learning_loss(
-        self, # type: ignore
-        train_data: Mapping[ # type: ignore
+        self,  # type: ignore
+        train_data: Mapping[  # type: ignore
             Any, tuple[jnp.ndarray, jnp.ndarray]
         ],  # New: train_data is now a dict
     ) -> jnp.ndarray:
@@ -190,7 +190,7 @@ class MFNetStructureLearner:
         # (node_id_ext)
         for j, node_id_ext in enumerate(self.idx_to_node):
             if node_id_ext in train_data:  # Check if this node has supervision
-                x_j, y_j = train_data[node_id_ext] # type: ignore
+                x_j, y_j = train_data[node_id_ext]  # type: ignore
 
                 # self.run(x_j) computes F for all nodes based on
                 # this x_j input
@@ -200,9 +200,9 @@ class MFNetStructureLearner:
                     self.n_nodes == 1
                 ):  # Special case for a single node, run() returns (batch, d)
                     # Make sure F has the correct batch and feature dimensions
-                    pred_j = F # type: ignore
+                    pred_j = F  # type: ignore
                 else:  # Multi-node case
-                    d_j = y_j.shape[-1] # type: ignore
+                    d_j = y_j.shape[-1]  # type: ignore
                     # F has shape (n_nodes, batch, max_dim), select for node j
                     # and trim padding
                     pred_j = F[j, :, :d_j]
@@ -433,10 +433,10 @@ class AutoMFNet:
         return G
 
     def fit_parameters(
-        self, # type: ignore
-        dag: nx.DiGraph, # type: ignore
-        param_data: Mapping[ # type: ignore
-            Any, tuple[jnp.ndarray, jnp.ndarray] # type: ignore
+        self,  # type: ignore
+        dag: nx.DiGraph,  # type: ignore
+        param_data: Mapping[  # type: ignore
+            Any, tuple[jnp.ndarray, jnp.ndarray]  # type: ignore
         ],  # New: Mapping from external ID to data
         n_iters: int = 5000,
         learning_rate: float = 1e-3,
