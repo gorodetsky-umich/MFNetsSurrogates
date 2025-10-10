@@ -60,8 +60,8 @@ def _instantiate_model(
     d_in: int,
     d_out: int,
     d_parent: int,
-    key: jax.Array, # Changed from jax.random.PRNGKey to jax.Array
-) -> Model: # Added explicit return type
+    key: jax.Array,  # Changed from jax.random.PRNGKey to jax.Array
+) -> Model:  # Added explicit return type
     """Instantiate a model based on the specification."""
     # Case-insensitive lookup so "PCEModel" == "pcemodel"
     initializer = next(
@@ -452,7 +452,9 @@ def run(
         edge_tpl = config.edge_model
 
         def edge_fn(
-            nid: Any, dim: int, parent_dims: Sequence[int] # Changed list[int] to Sequence[int]
+            nid: Any,
+            dim: int,
+            parent_dims: Sequence[int],  # Changed list[int] to Sequence[int]
         ) -> Model:  # Added return type
             if nid not in dim_info:
                 console.print(
