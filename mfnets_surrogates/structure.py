@@ -125,8 +125,8 @@ class MFNetStructureLearner:
         # Sink node is implicitly handled by the constraint_mask.
         inst = cls(
             node_ids=node_ids,  # Pass node_ids for internal mapping reconstruction
-            base_models=base_models,
-            sink_node=None,  # When unflattening, sink is encoded in mask
+            base_models=base_models,  # When unflattening, sink is encoded in mask
+            sink_node=None,
             alpha=alpha,
             beta=beta,
         )
@@ -148,8 +148,8 @@ class MFNetStructureLearner:
 
         # 1) Compute each base-model output δ_j(x) with shape (batch, d_j)
         outputs = [m.run(x_input) for m in self.base_models]
-        dims = [o.shape[-1] for o in outputs]
-        max_dim = max(dims)
+        dims = [o.shape[-1] for o in outputs] # type: ignore
+        max_dim = max(dims) # type: ignore
 
         # 2) Pad each δ_j to width max_dim along last axis
         padded = [
@@ -176,8 +176,8 @@ class MFNetStructureLearner:
         return cast(jnp.ndarray, F)
 
     def structure_learning_loss(
-        self,
-        train_data: Mapping[
+        self, # type: ignore
+        train_data: Mapping[ # type: ignore
             Any, tuple[jnp.ndarray, jnp.ndarray]
         ],  # New: train_data is now a dict
     ) -> jnp.ndarray:
@@ -190,18 +190,19 @@ class MFNetStructureLearner:
         # (node_id_ext)
         for j, node_id_ext in enumerate(self.idx_to_node):
             if node_id_ext in train_data:  # Check if this node has supervision
-                x_j, y_j = train_data[node_id_ext]
+                x_j, y_j = train_data[node_id_ext] # type: ignore
 
-                # self.run(x_j) computes F for all nodes based on this x_j input
+                # self.run(x_j) computes F for all nodes based on
+                # this x_j input
                 F = self.run(x_j)
 
                 if (
                     self.n_nodes == 1
                 ):  # Special case for a single node, run() returns (batch, d)
                     # Make sure F has the correct batch and feature dimensions
-                    pred_j = F
+                    pred_j = F # type: ignore
                 else:  # Multi-node case
-                    d_j = y_j.shape[-1]
+                    d_j = y_j.shape[-1] # type: ignore
                     # F has shape (n_nodes, batch, max_dim), select for node j
                     # and trim padding
                     pred_j = F[j, :, :d_j]
@@ -277,16 +278,17 @@ class MFNetStructureLearner:
         return jnp.abs(W) > threshold
 
     def to_graph(self, threshold: float) -> nx.DiGraph:
-        """Convert learned structure to a NetworkX DAG with associated base
-        models.
+        """Convert learned structure to a NetworkX DAG.
 
-        The nodes in the returned graph will use the external node IDs stored
-        in `self.node_ids`, and each node will have an attribute 'func'
-        containing its corresponding base model from `self.base_models`.
+        It associates base models with nodes, using external node IDs and their
+        corresponding `base_models` from `self.base_models`.
         """
         mask = self.adjacency_mask(threshold)
         G = nx.DiGraph()
         # 1) Add nodes with their corresponding base_models
+        # Using idx_to_node and base_models ensures alignment by internal index
+        # while exposing external node IDs in the graph.
+        # base_models will be replaced later by leaf/edge functions.
         for i, node_id_ext in enumerate(self.idx_to_node):
             G.add_node(node_id_ext, func=self.base_models[i])
         # 2) Add edges where mask is True, skipping any self-loops
@@ -431,10 +433,10 @@ class AutoMFNet:
         return G
 
     def fit_parameters(
-        self,
-        dag: nx.DiGraph,
-        param_data: Mapping[
-            Any, tuple[jnp.ndarray, jnp.ndarray]
+        self, # type: ignore
+        dag: nx.DiGraph, # type: ignore
+        param_data: Mapping[ # type: ignore
+            Any, tuple[jnp.ndarray, jnp.ndarray] # type: ignore
         ],  # New: Mapping from external ID to data
         n_iters: int = 5000,
         learning_rate: float = 1e-3,
@@ -442,8 +444,9 @@ class AutoMFNet:
         verbose: bool = True,
         log_every: int = 100,
     ) -> MFNetJax:
-        """Train the full-fidelity DAG by fitting its parameters with
-        MFNetJax.fit.
+        """Train the full-fidelity DAG.
+
+        It fits its parameters using `MFNetJax.fit`.
         """
         # Need to convert param_data dict to a list ordered by dag nodes for
         # MFNetJax.fit

@@ -108,8 +108,9 @@ def _load_training_data(
     dict[Any, tuple[jnp.ndarray, jnp.ndarray]],
     Sequence[Any],
 ]:
-    """Load all training datasets and derive model dimensions, returning a
-    mapping for structure learning.
+    """Load training data and derive model dimensions.
+
+    Returns a mapping from external node IDs to (x, y) tuples for structure learning.
     """
     console.print("Loading training data...")
     training_datasets = [d for d in config.datasets if d.type == "training"]
