@@ -123,11 +123,12 @@ def test_structure_learner_single_node_fit(key):
     # Check that the model is an instance of LinearModel and its parameters
     # are close
     assert isinstance(dag.nodes[0]["func"], LinearModel)
+    # Access parameters by index, which is more robust for NamedTuples
     npt.assert_allclose(
-        dag.nodes[0]["func"].params.w, delta.params.w, atol=1e-6
+        dag.nodes[0]["func"].params[0], delta.params.w, atol=1e-6
     )
     npt.assert_allclose(
-        dag.nodes[0]["func"].params.b, delta.params.b, atol=1e-6
+        dag.nodes[0]["func"].params[1], delta.params.b, atol=1e-6
     )
 
 
@@ -209,9 +210,9 @@ def test_structure_learner_recovers_known_dag(key):
         alpha=1.0,
         beta=1.0,
     )
-    learner = learner.fit(train_data, n_iters=10000, learning_rate=1e-3)
+    learner = learner.fit(train_data, n_iters=20000, learning_rate=1e-3)
 
-    # Check the learned adjacency matrix.
+    # Check the learned adjacency matrix.  # noqa: E501
     # We expect W[0,1] and W[1,2] to be strong, W[0,2] weaker, and others
     # small. Node 2 is sink, so W[2,:] should be near zero after mask.
     npt.assert_array_less(learner.adjacency_matrix[2, :], 1e-2)  # 2 is sink
@@ -328,7 +329,7 @@ def test_auto_mfnet_single_node_pipeline(key):
         node_ids=node_ids,
         base_models=base_models_map,
         structure_data=structure_data,
-        n_iters=100,
+        n_iters=1000,  # Increased iterations for better convergence
     )
 
     # leaf_model_fn and edge_model_fn now accept external node ID
@@ -355,7 +356,7 @@ def test_auto_mfnet_single_node_pipeline(key):
     )  # Should now be a leaf model
 
     mfnet = auto.fit_parameters(
-        dag, param_data, n_iters=100, learning_rate=1.0, verbose=False
+        dag, param_data, n_iters=1000, learning_rate=1.0, verbose=False  # Increased iterations
     )
     (pred,) = mfnet.run((0,), x)
     npt.assert_allclose(pred, y, atol=1e-5)
@@ -391,7 +392,7 @@ def test_auto_mfnet_two_node_no_edge(key):
         node_ids=node_ids,
         base_models=base_models_map,
         structure_data=structure_data,
-        n_iters=1000,
+        n_iters=5000,  # Increased iterations for structure learning
     )
 
     # leaf_model_fn and edge_model_fn now accept external node ID
