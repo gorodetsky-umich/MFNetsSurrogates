@@ -1,14 +1,17 @@
 import jax
 import jax.numpy as jnp
+import numpy.testing as npt
 import pytest
 from jax import tree_util
+from unittest.mock import Mock
 
 from mfnets_surrogates import (
     AutoMFNet,
     LinearModel,
     LinearParams,
     MFNetStructureLearner,
-    init_linear_params,
+    Model, # Added import for Mock
+    init_linear_model, # Added import for convenience functions
 )
 
 
@@ -23,7 +26,7 @@ def test_tree_flatten_unflatten_roundtrip(key):
     params1 = LinearParams(jnp.ones((3, 2)), jnp.ones(3))
     m0 = LinearModel(params0)
     m1 = LinearModel(params1)
-    learner = MFNetStructureLearner([m0, m1], sink_node=1, alpha=0.5, beta=2.0)
+    learner = MFNetStructureLearner(node_ids=[0, 1], base_models=[m0, m1], sink_node=1, alpha=0.5, beta=2.0)
 
     leaves, aux = tree_util.tree_flatten(learner)
     rebuilt = tree_util.tree_unflatten(aux, leaves)
@@ -46,7 +49,7 @@ def test_single_node_forward_identity(key):
     weight = jnp.eye(2) * 2.0
     bias = jnp.ones(2) * 3.0
     delta = LinearModel(LinearParams(weight, bias))
-    learner = MFNetStructureLearner([delta], sink_node=None)
+    learner = MFNetStructureLearner(node_ids=[0], base_models=[delta], sink_node=None)
 
     # With W=0, F == Δ
     x = jax.random.normal(key, (4, 2))
@@ -61,7 +64,7 @@ def test_sink_node_mask_enforced(key):
     params1 = LinearParams(jnp.zeros((1, 1)), jnp.zeros(1))
     m0 = LinearModel(params0)
     m1 = LinearModel(params1)
-    learner = MFNetStructureLearner([m0, m1], sink_node=0)
+    learner = MFNetStructureLearner(node_ids=[0, 1], base_models=[m0, m1], sink_node=0)
 
     # Mask should zero out row 0
     mask = learner.constraint_mask
@@ -109,7 +112,10 @@ def test_structure_learner_single_node_fit(key):
     assert len(dag.nodes) == 1
     assert 0 in dag.nodes
     assert len(dag.edges) == 0
-    assert dag.nodes[0]["func"] is delta
+    # Check that the model is an instance of LinearModel and its parameters are close
+    assert isinstance(dag.nodes[0]["func"], LinearModel)
+    npt.assert_allclose(dag.nodes[0]["func"].params.w, delta.params.w, atol=1e-6)
+    npt.assert_allclose(dag.nodes[0]["func"].params.b, delta.params.b, atol=1e-6)
 
 
 def test_structure_learner_partial_supervision(key):
@@ -195,7 +201,7 @@ def test_structure_learner_recovers_known_dag(key):
     # Check the learned adjacency matrix.
     # We expect W[0,1] and W[1,2] to be strong, W[0,2] weaker, and others small.
     # Node 2 is sink, so W[2,:] should be near zero after mask.
-    jnp.testing.assert_array_less(
+    npt.assert_array_less(
         learner.adjacency_matrix[2, :], 1e-2
     )  # 2 is sink
 
@@ -211,9 +217,7 @@ def test_structure_learner_recovers_known_dag(key):
     assert not dag.has_edge(1, 0)
     assert not dag.has_edge(2, 0)
     assert not dag.has_edge(2, 1)
-    assert isinstance(
-        dag.nodes[0]["func"], Model
-    )  # Check that base models are attached
+    assert isinstance(dag.nodes[0]["func"], Model) # Check that base models are attached
 
 
 # ----------------------------------------------------------------------
@@ -225,9 +229,9 @@ def test_get_weights_and_mask():
     d = 1
     k0, k1, k2 = jax.random.split(jax.random.PRNGKey(0), 3)
     base_models_list = [
-        LinearModel(init_linear_params(k0, d, d)),
-        LinearModel(init_linear_params(k1, d, d)),
-        LinearModel(init_linear_params(k2, d, d)),
+        init_linear_model(k0, d, d),
+        init_linear_model(k1, d, d),
+        init_linear_model(k2, d, d),
     ]
     node_ids = [0, 1, 2]
     learner = MFNetStructureLearner(
@@ -237,23 +241,23 @@ def test_get_weights_and_mask():
     learner.adjacency_matrix = jnp.array(
         [[0.0, 0.5, 0.2], [0.0, 0.0, 0.7], [0.0, 0.0, 0.0]]
     )
-    # constraint_mask is set by sink_node during __init__
-    # expected mask is [[1., 1., 1.], [1., 1., 1.], [0., 0., 0.]]
+    # constraint_mask is set by sink_node during __init__ (node 2 is sink)
+    # expected mask is [[1., 1., 1.], [1., 1., 1.], [0., 0., 0.]] at internal indices
     W = learner.get_weights()
     expected_W = jnp.array([[0.0, 0.5, 0.2], [0.0, 0.0, 0.7], [0.0, 0.0, 0.0]])
-    jnp.testing.assert_allclose(W, expected_W, atol=1e-6)
+    npt.assert_allclose(W, expected_W, atol=1e-6)
 
     mask_strict = learner.adjacency_mask(threshold=0.6)
     expected_mask_strict = jnp.array(
         [[False, False, False], [False, False, True], [False, False, False]]
     )
-    jnp.testing.assert_array_equal(mask_strict, expected_mask_strict)
+    npt.assert_array_equal(mask_strict, expected_mask_strict)
 
     mask_loose = learner.adjacency_mask(threshold=0.1)
     expected_mask_loose = jnp.array(
         [[False, True, True], [False, False, True], [False, False, False]]
     )
-    jnp.testing.assert_array_equal(mask_loose, expected_mask_loose)
+    npt.assert_array_equal(mask_loose, expected_mask_loose)
 
 
 def test_to_graph_constructs_correct_dag():
@@ -341,7 +345,7 @@ def test_auto_mfnet_single_node_pipeline(key):
         dag, param_data, n_iters=100, learning_rate=1.0, verbose=False
     )
     (pred,) = mfnet.run((0,), x)
-    jnp.testing.assert_allclose(pred, y, atol=1e-5)
+    npt.assert_allclose(pred, y, atol=1e-5)
 
 
 def test_auto_mfnet_two_node_no_edge(key):
@@ -402,5 +406,5 @@ def test_auto_mfnet_two_node_no_edge(key):
     )
     (pred1,) = mfnet.run((1,), x1)
     (pred2,) = mfnet.run((2,), x2)
-    jnp.testing.assert_allclose(pred1, y1, atol=1e-5)
-    jnp.testing.assert_allclose(pred2, y2, atol=1e-5)
+    npt.assert_allclose(pred1, y1, atol=1e-5)
+    npt.assert_allclose(pred2, y2, atol=1e-5)
