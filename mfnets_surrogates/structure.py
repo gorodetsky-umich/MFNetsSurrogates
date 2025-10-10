@@ -275,7 +275,7 @@ class AutoMFNet:
 
     def __init__(
         self,
-        sink_node: int | None = None,
+        sink_node: Any | None = None, # New: now accepts external node ID
         alpha: float = 1.0,
         beta: float = 1.0,
     ):
@@ -290,32 +290,39 @@ class AutoMFNet:
         self.alpha = alpha
         self.beta = beta
 
-        self.base_models: list[Model] | None = None
+        self.node_ids: Sequence[Any] | None = None # Store the ordered external node IDs
+        self.base_models_map: Mapping[Any, Model] | None = None # Store models by external ID
         self.learner: MFNetStructureLearner | None = None
         self.dag: nx.DiGraph | None = None
         self.trained_mfnet: MFNetJax | None = None
 
     def fit_structure(
         self,
-        base_models: Sequence[Model],
-        structure_data: list[tuple[jnp.ndarray, jnp.ndarray] | None],
+        node_ids: Sequence[Any], # New: Explicit order of node IDs (external)
+        base_models: Mapping[Any, Model], # New: Mapping from external ID to base model
+        structure_data: Mapping[Any, tuple[jnp.ndarray, jnp.ndarray]], # New: Mapping from external ID to data
         n_iters: int = 1000,
         learning_rate: float = 1e-3,
     ) -> MFNetStructureLearner:
         """Learn adjacency matrix W and base-model parameters."""
-        # Store the base_models for structure learning
-        self.base_models = list(base_models)
+        self.node_ids = node_ids # Store the canonical node order
+        self.base_models_map = base_models # Store the map of base models by external ID
+
+        # Create an ordered list of base models based on node_ids for the learner's __init__
+        ordered_base_models = [base_models[nid] for nid in node_ids]
+
         # Choose sink_node: user-supplied or highest-fidelity supervised node
-        if self.sink_node is None:
-            sup_idxs = [
-                i for i, d in enumerate(structure_data) if d is not None
-            ]
-            primary_sink = sup_idxs[-1] if sup_idxs else None
+        primary_sink_id = self.sink_node
+        if primary_sink_id is None:
+            # Find the last node in the provided node_ids sequence that has training data
+            supervised_node_ids = [nid for nid in node_ids if nid in structure_data]
+            primary_sink_id = supervised_node_ids[-1] if supervised_node_ids else None
         else:
-            primary_sink = self.sink_node
+            primary_sink_id = self.sink_node
         learner = MFNetStructureLearner(
-            self.base_models,
-            sink_node=primary_sink,
+            node_ids=node_ids, # Pass the ordered list of external node IDs
+            base_models=ordered_base_models, # Pass the ordered list of models
+            sink_node=primary_sink_id, # Pass the external sink node ID
             alpha=self.alpha,
             beta=self.beta,
         )
@@ -326,9 +333,9 @@ class AutoMFNet:
 
     def extract_dag(
         self,
-        threshold: float,
-        leaf_model_fn: Callable[[int, int], Model],
-        edge_model_fn: Callable[[int, int, Sequence[int]], Model],
+        threshold: float, 
+        leaf_model_fn: Callable[[Any, int], Model], # New: nid is Any (external ID)
+        edge_model_fn: Callable[[Any, int, Sequence[int]], Model], # New: nid is Any (external ID)
     ) -> nx.DiGraph:
         """Prune W at threshold and build a DAG with full models.
 
@@ -337,40 +344,22 @@ class AutoMFNet:
         """
         if self.learner is None:
             raise RuntimeError("You must call fit_structure(...) first.")
-
-        # The external node IDs are typically 1-indexed in the CLI and config.
-        # This change maps the internal 0-indexed learner nodes to 1-indexed
-        # external IDs
-        # when constructing the NetworkX graph.
-        node_ids_for_graph = list(range(1, self.learner.n_nodes + 1))
-
-        # Guard: fit_structure must have populated self.base_models
-        if self.base_models is None:  # pragma: no cover
+        if self.base_models_map is None or self.node_ids is None: # pragma: no cover
             raise RuntimeError("fit_structure() must be called first.")
-        base_models: list[Model] = self.base_models
 
-        # Create a mapping from the new 1-indexed node IDs to the original
-        # 0-indexed base models
-        node_funcs_map = {
-            new_id: base_models[idx]
-            for idx, new_id in enumerate(node_ids_for_graph)
-        }
+        # `to_graph` now returns a graph with arbitrary external node IDs and base models as funcs
+        G = self.learner.to_graph(threshold=threshold)
 
-        # create initial graph with placeholder funcs (use base models)
-        G = self.learner.to_graph(
-            node_ids=node_ids_for_graph,
-            node_funcs=node_funcs_map,
-            threshold=threshold,
-        )
-        for nid in G.nodes:
-            # Adjust index for base_models lookup (node_ids_for_graph are
-            # 1-based, base_models is 0-based)
-            original_idx = nid - 1
-            node_dim = base_models[original_idx].output_dim()
+        # Replace base models with leaf/edge models using the provided functions
+        for nid in G.nodes: # Iterate over external node IDs
+            # Lookup the original base model's output dimension using the external ID
+            original_base_model = self.base_models_map[nid] 
+            node_dim = original_base_model.output_dim()
             parent_ids = list(G.predecessors(nid))
-            parent_dims = [
-                base_models[p_id - 1].output_dim() for p_id in parent_ids
-            ]
+            
+            # Lookup parent dimensions using external IDs in base_models_map
+            parent_dims = [self.base_models_map[p_id].output_dim() for p_id in parent_ids]
+            
             if not parent_ids:
                 G.nodes[nid]["func"] = leaf_model_fn(nid, node_dim)
             else:
@@ -383,17 +372,24 @@ class AutoMFNet:
     def fit_parameters(
         self,
         dag: nx.DiGraph,
-        param_data: list[tuple[jnp.ndarray, jnp.ndarray]],
+        param_data: Mapping[Any, tuple[jnp.ndarray, jnp.ndarray]], # New: Mapping from external ID to data
         n_iters: int = 5000,
         learning_rate: float = 1e-3,
         loss_fn: Callable = mse_loss_graph,
         verbose: bool = True,
         log_every: int = 100,
     ) -> MFNetJax:
-        """Train the full-fidelity DAG with MFNetJax.fit."""
+        """Train the full-fidelity DAG by fitting its parameters with MFNetJax.fit."""
+        # Need to convert param_data dict to a list ordered by dag nodes for MFNetJax.fit
+        ordered_param_data = []
+        for node_id_ext in sorted(dag.nodes): # Ensure a consistent order for MFNetJax.fit
+            if node_id_ext not in param_data:
+                raise ValueError(f"Training data missing for node {node_id_ext} required by DAG for parameter fitting.")
+            ordered_param_data.append(param_data[node_id_ext])
+
         mfnet = MFNetJax(dag)
         self.trained_mfnet = mfnet.fit(
-            param_data,
+            ordered_param_data, # Pass the ordered list of data
             n_iters=n_iters,
             learning_rate=learning_rate,
             loss_fn=loss_fn,
