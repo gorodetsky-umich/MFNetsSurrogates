@@ -410,8 +410,8 @@ class AutoMFNet:
         # base models as funcs
         G = self.learner.to_graph(threshold=threshold)
 
-        # Replace base models with leaf/edge models using the provided functions
-        for nid in G.nodes:  # Iterate over external node IDs
+        # Replace base models with leaf/edge models using the provided functions.
+        for nid in G.nodes:  # Iterate over external node IDs.
             # Lookup the original base model's output dimension using the
             # external ID
             original_base_model = self.base_models_map[nid]
