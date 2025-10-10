@@ -104,9 +104,10 @@ def _load_training_data(
 ) -> tuple[
     dict[str, Any],
     dict[int | str, tuple[int, int]],
-    list[tuple[jnp.ndarray, jnp.ndarray] | None],
+    dict[Any, tuple[jnp.ndarray, jnp.ndarray]],
+    Sequence[Any],
 ]:
-    """Load all training datasets and derive model dimensions."""
+    """Load all training datasets and derive model dimensions, returning a mapping for structure learning."""
     console.print("Loading training data...")
     training_datasets = [d for d in config.datasets if d.type == "training"]
     if not training_datasets:
@@ -115,17 +116,14 @@ def _load_training_data(
 
     all_data = {}
     dim_info = {}
-    # Initialize structure_data with None for all nodes, assuming
-    # nodes are 0-indexed internally
-    num_nodes = len(config.graph["nodes"])
-    structure_data = [None] * num_nodes
+    # structure_data will now map external node IDs to (x, y) tuples
+    structure_data: dict[Any, tuple[jnp.ndarray, jnp.ndarray]] = {}
+    config_node_ids = tuple(config.graph["nodes"]) # Capture the canonical order of nodes
 
     for dataset in training_datasets:
         data = jnp.load(dataset.data_path)
         all_data[dataset.name] = data
         for node_id in dataset.nodes:
-            # Ensure node_id is treated as an integer for indexing
-            node_idx = int(node_id)
             x_key = f"x_train_{node_id}"
             y_key = f"y_train_{node_id}"
             if x_key not in data or y_key not in data:
@@ -137,14 +135,13 @@ def _load_training_data(
             d_in = data[x_key].shape[1]
             d_out = data[y_key].shape[1]
             dim_info[node_id] = (d_in, d_out)
-
-            # Store data for structure learning, ensuring correct index
-            if 0 <= node_idx < num_nodes:
-                structure_data[node_idx] = (data[x_key], data[y_key])
+            # Store data for structure learning using the external node_id directly
+            if node_id in config_node_ids: # Only store if part of the defined graph
+                structure_data[node_id] = (data[x_key], data[y_key])
             else:
                 console.print(
-                    f"[bold red]Error: Node ID {node_id} is out of bounds "
-                    f"for structure_data indexing (0 to {num_nodes - 1}).[/]"
+                    f"[bold yellow]Warning: Training data found for node ID {node_id} "
+                    f"but it's not listed in config.graph['nodes']. Skipping for structure learning.[/]"
                 )
                 raise typer.Exit(code=1)
 
@@ -152,7 +149,7 @@ def _load_training_data(
         "Derived model dimensions from data for nodes: "
         f"{list(dim_info.keys())}"
     )
-    return all_data, dim_info, structure_data
+    return all_data, dim_info, structure_data, config_node_ids
 
 
 def _build_mfnet_from_config(

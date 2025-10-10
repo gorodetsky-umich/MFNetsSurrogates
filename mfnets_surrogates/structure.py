@@ -23,8 +23,9 @@ class MFNetStructureLearner:
 
     def __init__(
         self,
-        base_models: list[Model],
-        sink_node: int | None = None,
+        node_ids: Sequence[Any],  # New: Explicit sequence of node identifiers (external IDs)
+        base_models: Sequence[Model], # Sequence must correspond to `node_ids` by index
+        sink_node: Any | None = None, # Now accepts external node ID
         alpha: float = 1.0,
         beta: float = 1.0,
     ) -> None:
@@ -32,18 +33,34 @@ class MFNetStructureLearner:
         Initialize the structure learning engine.
 
         Args:
+            node_ids: A sequence of identifiers for the nodes in the graph.
+                      The order defines the internal 0-indexed mapping used for adjacency.
             base_models: A list of Model instances for δ_j outputs.
-            sink_node: Index of a node to force as sink (no outgoing edges).
+                         Must be ordered corresponding to `node_ids`.
+            sink_node: Identifier of a node to force as sink (no outgoing edges).
+                       Must be one of the `node_ids`. If None, no node is explicitly
+                       masked as a sink.
             alpha: Weight for acyclicity penalty.
             beta: Weight for L1 sparsity penalty.
         """
-        self.n_nodes = len(base_models)
+        if len(node_ids) != len(base_models):
+            raise ValueError("node_ids and base_models must have the same length.")
+
+        self.node_ids = tuple(node_ids) # Store node_ids as a tuple for immutability
+        self.node_to_idx = {node_id: i for i, node_id in enumerate(self.node_ids)}
+        self.idx_to_node = list(self.node_ids) # For unflatten, ensures consistent order
+
+        self.n_nodes = len(self.node_ids)
         self.adjacency_matrix = jnp.zeros((self.n_nodes, self.n_nodes))
         mask = jnp.ones_like(self.adjacency_matrix)
+
         if sink_node is not None:
-            mask = mask.at[sink_node, :].set(0.0)
+            if sink_node not in self.node_to_idx:
+                raise ValueError(f"Sink node '{sink_node}' not found in provided node_ids.")
+            sink_idx = self.node_to_idx[sink_node]
+            mask = mask.at[sink_idx, :].set(0.0)
         self.constraint_mask = mask
-        self.base_models = base_models
+        self.base_models = list(base_models) # Ensure it's a list for internal use
         self.alpha = alpha
         self.beta = beta
 
@@ -58,6 +75,7 @@ class MFNetStructureLearner:
             treedefs.append(m_def)
 
         aux_data = (
+            self.node_ids, # New: Store node_ids for reconstruction
             self.n_nodes,
             self.constraint_mask,
             treedefs,
@@ -71,7 +89,7 @@ class MFNetStructureLearner:
         cls, aux_data: tuple, children: list[jnp.ndarray]
     ) -> "MFNetStructureLearner":
         """Reconstruct instance from leaves and static data."""
-        n_nodes, constraint_mask, treedefs, alpha, beta = aux_data
+        node_ids, n_nodes, constraint_mask, treedefs, alpha, beta = aux_data # Unpack node_ids
         # First child is adjacency_matrix
         adj_matrix = children[0]
         # Next children correspond to base_models
@@ -83,10 +101,15 @@ class MFNetStructureLearner:
             idx += n_leaves
             model = tdef.unflatten(m_leaves)
             base_models.append(model)
-
-        # Identify sink_node by mask
-        sink_node = None  # mask only stored, not original sink
-        inst = cls(base_models, sink_node=sink_node, alpha=alpha, beta=beta)
+        
+        # Reconstruct with the actual node_ids and base_models
+        # Sink node is implicitly handled by the constraint_mask
+        inst = cls(
+            node_ids=node_ids, # Pass node_ids for internal mapping reconstruction
+            base_models=base_models,
+            sink_node=None, # When unflattening, the sink is encoded in constraint_mask
+            alpha=alpha, beta=beta
+        )
         inst.adjacency_matrix = adj_matrix
         inst.constraint_mask = constraint_mask
         return inst
@@ -100,7 +123,8 @@ class MFNetStructureLearner:
         # Shortcut for single node: just return its raw output
         if self.n_nodes == 1:
             # mypy: explicit cast to satisfy static checker
-            return cast(jnp.ndarray, self.base_models[0].run(x_input))
+            # This relies on base_models[0] being the only model, which aligns with node_ids[0]
+            return cast(jnp.ndarray, self.base_models[0].run(x_input)) 
 
         # 1) Compute each base-model output δ_j(x) with shape (batch, d_j)
         outputs = [m.run(x_input) for m in self.base_models]
@@ -133,24 +157,34 @@ class MFNetStructureLearner:
 
     def structure_learning_loss(
         self,
-        train_data: list[tuple[jnp.ndarray, jnp.ndarray] | None],
+        train_data: Mapping[Any, tuple[jnp.ndarray, jnp.ndarray]], # New: train_data is now a dict
     ) -> jnp.ndarray:
         """Compute loss over datasets: data-fit, DAG & sparsity penalties."""
         # Accumulate MSE only for supervised nodes
         mse_total: jnp.ndarray = jnp.array(0.0)
-        for j, entry in enumerate(train_data):
-            if entry is not None:
-                x_j, y_j = entry
-                # run ⇒ shape (n_nodes, batch_j, max_dim)
-                # or (batch_j, d) if single node
-                F = self.run(x_j)
-                if F.ndim == 2:
-                    # make it (1, batch, dim) so F[j, ...] works
-                    F = F[None, ...]
-                d_j = y_j.shape[-1]
-                pred_j = F[j, :, :d_j]
-                mse_total += jnp.mean((pred_j - y_j) ** 2)
+        num_supervised_nodes = 0
 
+        # Iterate through internal node indices (j) and external node IDs (node_id_ext)
+        for j, node_id_ext in enumerate(self.idx_to_node):
+            if node_id_ext in train_data: # Check if this node has supervision
+                x_j, y_j = train_data[node_id_ext]
+                
+                # self.run(x_j) computes F for all nodes based on this x_j input
+                F = self.run(x_j) 
+                
+                if self.n_nodes == 1: # Special case for a single node, run() returns (batch, d) directly
+                    # Make sure F has the correct batch and feature dimensions
+                    pred_j = F 
+                else: # Multi-node case
+                    d_j = y_j.shape[-1]
+                    # F has shape (n_nodes, batch, max_dim), select for node j and trim padding
+                    pred_j = F[j, :, :d_j] 
+                
+                mse_total += jnp.mean((pred_j - y_j) ** 2)
+                num_supervised_nodes += 1
+
+        if num_supervised_nodes > 0:
+            mse_total /= num_supervised_nodes
         # Acyclicity penalty
         W = self.adjacency_matrix * self.constraint_mask
         H = W * W
@@ -163,7 +197,7 @@ class MFNetStructureLearner:
 
     def fit(
         self,
-        train_data: list[tuple[jnp.ndarray, jnp.ndarray] | None],
+        train_data: Mapping[Any, tuple[jnp.ndarray, jnp.ndarray]], # New: train_data is now a dict
         n_iters: int = 1000,
         learning_rate: float = 1e-3,
     ) -> "MFNetStructureLearner":
@@ -171,8 +205,12 @@ class MFNetStructureLearner:
         Train the structure learner.
 
         Args:
-            train_data: List where each element is either (x_j, y_j) or None.
+            train_data: Dictionary where keys are external node IDs and values
+                        are (x, y) tuples. Only nodes present in this mapping
+                        will contribute to the data-fit portion of the loss.
         """
+        if not train_data and self.n_nodes > 0:
+            raise ValueError("train_data cannot be empty when learning structure for multiple nodes.")
         optimizer = optax.adam(learning_rate)
         state = optimizer.init(self)
 
@@ -180,17 +218,18 @@ class MFNetStructureLearner:
         def train_step(
             model: "MFNetStructureLearner",
             opt_state: optax.OptState,
-        ) -> tuple["MFNetStructureLearner", optax.OptState, jnp.ndarray]:
+            current_train_data: Mapping[Any, tuple[jnp.ndarray, jnp.ndarray]], # Pass data to jitted fn
+        ) -> tuple["MFNetStructureLearner", optax.OptState, jnp.ndarray]: 
             loss, grads = jax.value_and_grad(
-                lambda m: m.structure_learning_loss(train_data)
+                lambda m: m.structure_learning_loss(current_train_data)
             )(model)
             updates, opt_state = optimizer.update(grads, opt_state, model)
             model = optax.apply_updates(model, updates)
             return model, opt_state, loss
 
         model = self
-        for _ in range(n_iters):
-            model, state, _ = train_step(model, state)
+        for step_idx in range(n_iters):
+            model, state, _ = train_step(model, state, train_data) # Pass train_data to the jitted step
         return model
 
     def get_weights(self) -> jnp.ndarray:
@@ -202,26 +241,25 @@ class MFNetStructureLearner:
         W = self.get_weights()
         return jnp.abs(W) > threshold
 
-    def to_graph(
-        self,
-        node_ids: Sequence[Any],
-        node_funcs: Mapping[Any, Model],
-        threshold: float,
-    ) -> nx.DiGraph:
-        """Convert learned structure to a NetworkX DAG with provided models."""
+    def to_graph(self, threshold: float) -> nx.DiGraph:
+        """
+        Convert learned structure to a NetworkX DAG with associated base models.
+        
+        The nodes in the returned graph will use the external node IDs stored in
+        `self.node_ids`, and each node will have an attribute 'func' containing
+        its corresponding base model from `self.base_models`.
+        """
         mask = self.adjacency_mask(threshold)
         G = nx.DiGraph()
-        # 1) Add nodes
-        for nid in node_ids:
-            if nid not in node_funcs:
-                raise KeyError(f"No model provided for node {nid!r}")
-            G.add_node(nid, func=node_funcs[nid])
+        # 1) Add nodes with their corresponding base_models
+        for i, node_id_ext in enumerate(self.idx_to_node):
+            G.add_node(node_id_ext, func=self.base_models[i])
         # 2) Add edges where mask is True, skipping any self-loops
-        for i, src in enumerate(node_ids):
-            for j, dst in enumerate(node_ids):
+        for i, src_node_id_ext in enumerate(self.idx_to_node):
+            for j, dst_node_id_ext in enumerate(self.idx_to_node):
                 if i == j or not mask[i, j]:
                     continue
-                G.add_edge(src, dst)
+                G.add_edge(src_node_id_ext, dst_node_id_ext)
         return G
 
 
