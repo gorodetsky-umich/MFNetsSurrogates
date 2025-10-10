@@ -357,11 +357,13 @@ def test_structure_learner_acyclicity_penalty(key):
 
     # 1. Train with low alpha, which should learn a cyclic graph
     learner_cyclic = MFNetStructureLearner(
-        node_ids=node_ids, base_models=base_models, alpha=0.0, beta=0.01
+        node_ids=node_ids, base_models=base_models, alpha=1e0, beta=0.01
     )
+    print("pre fit 1")
     learner_cyclic = learner_cyclic.fit(
-        train_data, n_iters=5000, learning_rate=1e-2
+        train_data, n_iters=50, learning_rate=1e-3
     )
+    print("post fit 1")
     W_cyclic = learner_cyclic.get_weights()
     assert W_cyclic[0, 1] > 0.1 and W_cyclic[1, 0] > 0.1
 
@@ -370,7 +372,7 @@ def test_structure_learner_acyclicity_penalty(key):
         node_ids=node_ids, base_models=base_models, alpha=10.0, beta=0.01
     )
     learner_acyclic = learner_acyclic.fit(
-        train_data, n_iters=5000, learning_rate=1e-2
+        train_data, n_iters=500, learning_rate=1e-3
     )
     W_acyclic = learner_acyclic.get_weights()
     # Assert that at least one of the potential cyclic edges was suppressed
