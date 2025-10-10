@@ -278,13 +278,15 @@ def main():
     # ------------------------------------------------------------------
     # 3. Two-stage AutoMFNet demonstration
     print("\n--- 3. Training AutoMFNet Discovered Structure ---")
-    
+
     # Node IDs are 0, 1, 2, 3 as used in the manual graphs
     auto_node_ids = (0, 1, 2, 3)
 
     # Stage-1 base models: as a dictionary mapping node_id to model
     base_models_for_auto = {
-        i: init_mlp_model(jax.random.split(key, 5)[i], [d_in, 16, 16, d_out], jax.nn.tanh)
+        i: init_mlp_model(
+            jax.random.split(key, 5)[i], [d_in, 16, 16, d_out], jax.nn.tanh
+        )
         for i in auto_node_ids
     }
 
@@ -307,7 +309,9 @@ def main():
     # leaf_model_fn and edge_model_fn now receive the external node ID (nid)
     dag_auto = auto.extract_dag(
         threshold=0.1,
-        leaf_model_fn=lambda nid, dim: base_models_for_auto[nid], # Reuse the base model
+        leaf_model_fn=lambda nid, dim: base_models_for_auto[
+            nid
+        ],  # Reuse the base model
         edge_model_fn=lambda nid, dim, pdims: init_mlp_enhancement_model(
             # Use hash(nid) for PRNGKey to support arbitrary node IDs if needed
             jax.random.PRNGKey(hash(nid) % (2**31 - 1)),
@@ -317,10 +321,10 @@ def main():
     )
     # Diagnostic: print discovered DAG edges
     print(" Discovered DAG edges:", list(dag_auto.edges))
-    
+
     # Plot discovered graph
     plot_graph_on_ax(ax_map["Auto"][0], dag_auto, "AutoMFNet Discovered Graph")
-    
+
     # Stage-2: train all fidelities on this fixed DAG
     # Convert y_train tuple to a dict mapping node ID to (x_train, y)
     param_data_auto = {nid: (x_train, y_train[nid]) for nid in auto_node_ids}
@@ -331,7 +335,7 @@ def main():
     print(f"  AutoMFNet Pre-training MSE: {mse_train_pre:1.6E}")
     mfnet_auto = auto.fit_parameters(
         dag_auto,
-        param_data_auto, # Pass the dictionary
+        param_data_auto,  # Pass the dictionary
         n_iters=5000,
         learning_rate=1e-3,
         verbose=False,
