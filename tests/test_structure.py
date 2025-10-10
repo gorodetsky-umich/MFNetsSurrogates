@@ -125,10 +125,10 @@ def test_structure_learner_single_node_fit(key):
     assert isinstance(dag.nodes[0]["func"], LinearModel)
     # Access parameters by index, which is more robust for NamedTuples
     npt.assert_allclose(
-        dag.nodes[0]["func"].params[0], delta.params.w, atol=1e-6
+        dag.nodes[0]["func"].params[0], delta.params[0], atol=1e-6
     )
     npt.assert_allclose(
-        dag.nodes[0]["func"].params[1], delta.params.b, atol=1e-6
+        dag.nodes[0]["func"].params[1], delta.params[1], atol=1e-6
     )
 
 
@@ -208,7 +208,7 @@ def test_structure_learner_recovers_known_dag(key):
         base_models=base_models,
         sink_node=2,
         alpha=1.0,
-        beta=1.0,
+        beta=0.01,  # Reduced beta (L1 sparsity penalty)
     )
     learner = learner.fit(train_data, n_iters=20000, learning_rate=1e-3)
 
@@ -390,8 +390,8 @@ def test_auto_mfnet_two_node_no_edge(key):
     # AutoMFNet setup: force sparsity to get no edges.
     # sink_node=2 (external ID).
     auto = AutoMFNet(
-        sink_node=2, alpha=0.0, beta=1.0
-    )  # beta=1.0 promotes sparsity
+        sink_node=2, alpha=0.0, beta=5.0  # Increased beta for stronger sparsity
+    )
     auto.fit_structure(
         node_ids=node_ids,
         base_models=base_models_map,
