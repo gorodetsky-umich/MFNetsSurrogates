@@ -390,7 +390,9 @@ def test_auto_mfnet_two_node_no_edge(key):
     # AutoMFNet setup: force sparsity to get no edges.
     # sink_node=2 (external ID).
     auto = AutoMFNet(
-        sink_node=2, alpha=0.0, beta=5.0  # Increased beta for stronger sparsity
+        sink_node=2,
+        alpha=0.0,
+        beta=5.0,  # Increased beta for stronger sparsity
     )
     auto.fit_structure(
         node_ids=node_ids,
