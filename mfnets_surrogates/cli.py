@@ -48,11 +48,19 @@ ACTIVATION_FUNCTIONS: dict[str, Callable[[jnp.ndarray], jnp.ndarray]] = {
 def _load_and_validate_config(config_path: Path) -> Config:
     """Load and validate the YAML config file using Pydantic."""
     console.print(f"Loading configuration from: [bold cyan]{config_path}[/]")
-    try:
-        with open(config_path) as f:
-            raw_config = yaml.safe_load(f)
-        return Config(**raw_config)
+    try:  # Using Pydantic V2 method for file validation
+        return Config.model_validate_file(config_path)
+    except FileNotFoundError as e:
+        console.print(
+            f"[bold red]Error parsing configuration file: "
+            f"File not found at '{config_path}'[/]"
+        )
+        raise typer.Exit(code=1) from e
+    except ValidationError as e:
+        console.print(f"[bold red]Configuration validation error:[/]\n{e}")
+        raise typer.Exit(code=1) from e
     except Exception as e:
+        # Catch other potential errors during YAML loading or Pydantic init
         console.print(f"[bold red]Error parsing configuration file:[/]\n{e}")
         raise typer.Exit(code=1) from e
 

@@ -106,9 +106,10 @@ datasets: []
 
     result = runner.invoke(app, ["run", "--config", str(config_path)])
     assert result.exit_code != 0
-    # Expected behavior now: _load_training_data is called first,
-    # finds no datasets.
-    assert "No training datasets found in config." in result.stdout
+    # `_load_training_data` is no longer called in this path after
+    # refactor. The validation for auto mode missing fields now fires
+    # directly.
+    assert "Missing required fields for auto mode." in result.stdout
 
 
 def test_cli_load_training_data_missing_keys(
@@ -140,6 +141,7 @@ def test_cli_load_training_data_node_not_in_graph_warning(
 ):
     """Test _load_training_data warns if node data is not in graph['nodes']."""
     # Corrected config for fixed mode: LinearModel needs valid params
+    # to pass config validation
     config_content = f"""
 mode: fixed
 graph:
@@ -168,7 +170,7 @@ datasets:
     )
 
 
-@patch("mfnets_surrogates.cli.AutoMFNet")
+@patch("mfnets_surrogates.structure.AutoMFNet") # Corrected patch target
 def test_cli_run_auto_mode_sink_node_inference(
     mock_auto_mfnet_cls, minimal_auto_config_path: Path
 ):
