@@ -244,7 +244,7 @@ class MFNetStructureLearner:
 
         # Acyclicity penalty
         W = self.adjacency_matrix * self.constraint_mask
-        H = W * W
+        H = W @ W
 
         if self.acyclicity_penalty_type == "expm":
             expm = jax.scipy.linalg.expm(H)
