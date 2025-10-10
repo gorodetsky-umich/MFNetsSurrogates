@@ -62,10 +62,27 @@ def _instantiate_model(
     d_in: int,
     d_out: int,
     d_parent: int,
-    key: jax.Array,  # Changed from jax.random.PRNGKey to jax.Array
-) -> Model:  # Added explicit return type
-    """Instantiate a model based on the specification."""
+    key: jax.Array,
+) -> Model:
+    """Instantiate a model based on the specification.
+
+    Args:
+        spec: A ModelParams object specifying the model type and its parameters.
+        d_in: The primary input dimension of the node model.
+        d_out: The output dimension of the node model.
+        d_parent: The combined output dimension of all parent nodes, if any.
+        key: A JAX PRNGKey for model initialization.
+
+    Returns:
+        An instantiated Model object.
+
+    Raises:
+        typer.Exit: If an unknown model type is specified.
+    """
     # Case-insensitive lookup so "PCEModel" == "pcemodel"
+    # This assumes a naming convention where model types in config
+    # (e.g., "PCEModel") correspond to init_PCEModel functions
+    # in net_jax.py.
     initializer = next(
         (
             fn
@@ -110,9 +127,24 @@ def _load_training_data(
     dict[Any, tuple[jnp.ndarray, jnp.ndarray]],
     Sequence[Any],
 ]:
-    """Load training data, derive model dimensions, and return a mapping.
+    """Load training data, derive model dimensions, and return processed data.
 
-    The mapping is from external node IDs to (x, y) tuples for
+    Args:
+        config: The parsed configuration object.
+
+    Returns:
+        A tuple containing:
+        - all_data: A dictionary mapping dataset names to raw loaded data.
+        - dim_info: A dictionary mapping node IDs to (input_dim, output_dim).
+        - structure_data: A dictionary mapping node IDs to (x, y) training
+                          data, used specifically for structure learning.
+        - config_node_ids: A sequence of node IDs as ordered in the config.
+
+    Raises:
+        typer.Exit: If no training datasets are found, or if data keys are
+                    missing from the NPZ files.
+
+    The `structure_data` mapping is from external node IDs to (x, y) tuples for
     structure learning.
     """
     console.print("Loading training data...")
@@ -156,11 +188,6 @@ def _load_training_data(
                     f"{node_id} but it's not listed in config.graph['nodes']. "
                     "Skipping for structure learning.[/]"
                 )
-                # The previous `raise typer.Exit(code=1)` here was redundant
-                # as the warning is often sufficient.
-                # If a node ID has data but isn't in graph.nodes, it won't be
-                # processed by the structure learner anyway.
-                # raise typer.Exit(code=1)
 
     console.print(
         "Derived model dimensions from data for nodes: "

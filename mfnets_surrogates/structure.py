@@ -342,17 +342,29 @@ class AutoMFNet:
 
     def fit_structure(
         self,
-        node_ids: Sequence[Any],  # New: Explicit order of node IDs (external)
-        base_models: Mapping[
-            Any, Model
-        ],  # New: Mapping from external ID to base model
-        structure_data: Mapping[
-            Any, tuple[jnp.ndarray, jnp.ndarray]
-        ],  # New: Mapping from external ID to data
+        node_ids: Sequence[Any],
+        # New: Explicit order of node IDs (external)
+        base_models: Mapping[Any, Model],
+        # New: Mapping from external ID to base model
+        structure_data: Mapping[Any, tuple[jnp.ndarray, jnp.ndarray]],
+        # New: Mapping from external ID to data
         n_iters: int = 1000,
         learning_rate: float = 1e-3,
     ) -> MFNetStructureLearner:
-        """Learn adjacency matrix W and base-model parameters."""
+        """Learn adjacency matrix W and base-model parameters.
+
+        Args:
+            node_ids: Sequence of node identifiers defining the graph's nodes.
+            base_models: Mapping from node IDs to base model instances for each
+                         node in the graph.
+            structure_data: Mapping from node IDs to (x, y) training data
+                            used for structure learning.
+            n_iters: Number of optimization iterations for structure learning.
+            learning_rate: Learning rate for the optimizer.
+
+        Returns:
+            The trained MFNetStructureLearner instance.
+        """
         self.node_ids = node_ids  # Store the canonical node order
         self.base_models_map = (
             base_models  # Store the map of base models by external ID
@@ -390,17 +402,23 @@ class AutoMFNet:
     def extract_dag(
         self,
         threshold: float,
-        leaf_model_fn: Callable[
-            [Any, int], Model
-        ],  # New: nid is Any (external ID)
-        edge_model_fn: Callable[
-            [Any, int, Sequence[int]], Model
-        ],  # New: nid is Any (external ID)
+        leaf_model_fn: Callable[[Any, int], Model],
+        # New: nid is Any (external ID)
+        edge_model_fn: Callable[[Any, int, Sequence[int]], Model],
+        # New: nid is Any (external ID)
     ) -> nx.DiGraph:
         """Prune W at threshold and build a DAG with full models.
 
-        leaf_model_fn(node_id, node_dim) -> Model
-        edge_model_fn(node_id, node_dim, parent_dims) -> Model
+        Args:
+            threshold: Threshold to prune edges from the learned adjacency matrix.
+            leaf_model_fn: A factory function `leaf_model_fn(node_id, node_dim) -> Model`
+                           to instantiate models for nodes that become leaves in the DAG.
+            edge_model_fn: A factory function `edge_model_fn(node_id, node_dim, parent_dims) -> Model`
+                           to instantiate models for nodes that have parents in the DAG.
+
+        Returns:
+            A NetworkX DiGraph representing the extracted DAG with instantiated
+            leaf and edge models.
         """
         if self.learner is None:
             raise RuntimeError("You must call fit_structure(...) first.")
@@ -437,20 +455,30 @@ class AutoMFNet:
         return G
 
     def fit_parameters(
-        self,  # type: ignore
-        dag: nx.DiGraph,  # type: ignore
-        param_data: Mapping[  # type: ignore
-            Any, tuple[jnp.ndarray, jnp.ndarray]  # type: ignore
-        ],  # New: Mapping from external ID to data
+        self,
+        dag: nx.DiGraph,
+        param_data: Mapping[Any, tuple[jnp.ndarray, jnp.ndarray]],
+        # Mapping from external node IDs to (x, y) training data for parameter fitting.
         n_iters: int = 5000,
         learning_rate: float = 1e-3,
         loss_fn: Callable = mse_loss_graph,
         verbose: bool = True,
         log_every: int = 100,
     ) -> MFNetJax:
-        """Train the full-fidelity DAG.
+        """Train the full-fidelity DAG by fitting its parameters with MFNetJax.fit.
 
-        It fits its parameters using `MFNetJax.fit`.
+        Args:
+            dag: The discovered and processed DAG with leaf/edge models.
+            param_data: Mapping from external node IDs to (x, y) training data
+                        for parameter fitting.
+            n_iters: Number of optimization iterations.
+            learning_rate: Learning rate for the optimizer.
+            loss_fn: Loss function to use during training (default: mse_loss_graph).
+            verbose: If True, display a progress bar.
+            log_every: Interval at which to log the loss.
+
+        Returns:
+            The trained MFNetJax instance.
         """
         # Need to convert param_data dict to a list ordered by dag nodes for
         # MFNetJax.fit

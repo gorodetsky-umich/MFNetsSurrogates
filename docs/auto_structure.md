@@ -15,14 +15,43 @@ multi-fidelity surrogate in two explicit stages:
 
 ---
 
-## How the structure loss works
+## How the structure learning works
 
-`F = Wᵀ F + Δ   ⇒   (I – Wᵀ) F = Δ`   →   **F = (I – Wᵀ)⁻¹ Δ**  
-(single linear solve, fully differentiable)
+The core idea is to learn a causal adjacency matrix `W` for the graph of fidelities.
+Each node `j` has a base model `δ_j(x)` (a neural network or other surrogate)
+that represents its intrinsic output given the primary input `x`.
+
+The full output `F_j` of node `j` in the multi-fidelity network is modeled as:
+
+`F_j = δ_j(x) + Σ_i W_ij F_i`
+
+Where `W_ij` is the learned weight of the edge from node `i` to node `j`.
+In matrix form, this becomes `F = Δ + Wᵀ F`, which can be rearranged as:
+
+`(I – Wᵀ) F = Δ   ⇒   F = (I – Wᵀ)⁻¹ Δ`
+
+This equation represents a single linear solve which is fully differentiable
+with respect to `W` and the parameters of the `δ` models.
 
 * `α·h(W)` – NOTEARS trace-exponential keeps W acyclic  
+    *   `h(W) = tr(exp(W ∘ W)) - N`, where `N` is the number of nodes.
+        This acyclicity constraint ensures that the learned graph is a
+        Directed Acyclic Graph (DAG), which is fundamental for consistent
+        multi-fidelity evaluation.
 * `β·‖W‖₁` – L1 pushes W toward sparsity  
+    *   The L1 norm `‖W‖₁ = Σ |W_ij|` encourages many `W_ij` elements to be
+        exactly zero, leading to a sparse graph structure where only the most
+        important connections are retained.
 * *Sink* node mask freezes outgoing edges from the highest-fidelity node
+    *   A designated "sink" node (typically the highest fidelity) will have all
+        its outgoing edge weights `W_sink,j` masked to zero. This ensures that
+        the highest fidelity node does not influence any other nodes.
+
+### Thresholding
+After learning the adjacency matrix `W`, a `threshold` `τ` is used to
+binarize the continuous weights `W_ij` into a discrete graph. Edges `(i,j)`
+are kept in the graph if `|W_ij| > τ`, otherwise they are removed. This step
+is part of `extract_dag`.
 
 ---
 
