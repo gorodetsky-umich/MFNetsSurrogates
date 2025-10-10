@@ -115,7 +115,8 @@ def _load_training_data(
 
     all_data = {}
     dim_info = {}
-    # Initialize structure_data with None for all nodes, assuming nodes are 0-indexed internally
+    # Initialize structure_data with None for all nodes, assuming
+    # nodes are 0-indexed internally
     num_nodes = len(config.graph["nodes"])
     structure_data = [None] * num_nodes
 
@@ -378,11 +379,12 @@ def run(
 
         base_models = []
         dims_seq = []
-        # The node IDs from config.graph["nodes"] are used to determine the order
-        # and number of base models. These are assumed to be 0-indexed internally
+        # The node IDs from config.graph["nodes"] are used to determine
+        # the order
+        # and number of base models. These are assumed to be 0-indexed
+        # internally
         # for the structure learner.
         sorted_node_ids = sorted(config.graph["nodes"])
-        num_internal_nodes = len(sorted_node_ids)
 
         for node_id in sorted_node_ids:
             spec = config.base_models.get(node_id)
@@ -393,13 +395,15 @@ def run(
                 raise typer.Exit(code=1)
             d_in, d_out = dim_info[node_id]
             key, sub = jax.random.split(key)
-            # Instantiate base models with d_parent=0 as they are not yet part of the DAG
+            # Instantiate base models with d_parent=0 as they are not yet
+            # part of the DAG
             base_models.append(_instantiate_model(spec, d_in, d_out, 0, sub))
             dims_seq.append((d_in, d_out))
 
         # The sink node in AutoMFNet is determined by the structure learner,
         # which uses the `sink_node` parameter if provided, or infers it.
-        # The `structure_data` list must be aligned with the `base_models` list.
+        # The `structure_data` list must be aligned with the `base_models`
+        # list.
         # The `_load_training_data` function now ensures `structure_data` is
         # correctly indexed by the internal node ID.
         auto = AutoMFNet(
@@ -447,7 +451,8 @@ def run(
         dag = auto.extract_dag(config.threshold, leaf_fn, edge_fn)
 
         # param_data should be the actual training data, not structure_data
-        # We need to reload the training data specifically for parameter fitting.
+        # We need to reload the training data specifically for parameter
+        # fitting.
         # Assuming the first training dataset in the config is the one to use.
         training_dataset_for_fit = next(
             (d for d in config.datasets if d.type == "training"), None
