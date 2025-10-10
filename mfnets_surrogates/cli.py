@@ -404,7 +404,7 @@ def run(
         auto.fit_structure(
             node_ids=config_node_ids, # Pass the ordered list of node IDs
             base_models=base_models_for_learner, # Pass the dict of models
-            structure_data,  # This is now correctly indexed
+            structure_data=structure_data,  # This is now correctly indexed
             n_iters=config.training.num_steps,
             learning_rate=config.training.learning_rate,
         )
