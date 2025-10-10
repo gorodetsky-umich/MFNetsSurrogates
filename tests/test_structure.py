@@ -1,3 +1,4 @@
+from typing import Any
 from unittest.mock import Mock
 
 import jax
@@ -119,7 +120,8 @@ def test_structure_learner_single_node_fit(key):
     assert len(dag.nodes) == 1
     assert 0 in dag.nodes
     assert len(dag.edges) == 0
-    # Check that the model is an instance of LinearModel and its parameters are close
+    # Check that the model is an instance of LinearModel and its parameters
+    # are close
     assert isinstance(dag.nodes[0]["func"], LinearModel)
     npt.assert_allclose(
         dag.nodes[0]["func"].params.w, delta.params.w, atol=1e-6
@@ -176,9 +178,9 @@ def test_structure_learner_recovers_known_dag(key):
     n_nodes, d_in, d_out = 3, 5, 1
     # Build base linear models δ_j(x) = x @ (c_j I) with c_j=1,2,3
     x_train = jax.random.normal(k_data, (2000, d_in))
-    model0 = LinearModel(init_linear_params(k0, d_in, d_out))
-    model1 = LinearModel(init_linear_params(k1, d_in, d_out))
-    model2 = LinearModel(init_linear_params(k2, d_in, d_out))
+    model0 = init_linear_model(k0, d_in, d_out)
+    model1 = init_linear_model(k1, d_in, d_out)
+    model2 = init_linear_model(k2, d_in, d_out)
 
     node_ids = [0, 1, 2]  # External node IDs
     base_models = [model0, model1, model2]  # Ordered list of base models
@@ -210,8 +212,8 @@ def test_structure_learner_recovers_known_dag(key):
     learner = learner.fit(train_data, n_iters=10000, learning_rate=1e-3)
 
     # Check the learned adjacency matrix.
-    # We expect W[0,1] and W[1,2] to be strong, W[0,2] weaker, and others small.
-    # Node 2 is sink, so W[2,:] should be near zero after mask.
+    # We expect W[0,1] and W[1,2] to be strong, W[0,2] weaker, and others
+    # small. Node 2 is sink, so W[2,:] should be near zero after mask.
     npt.assert_array_less(learner.adjacency_matrix[2, :], 1e-2)  # 2 is sink
 
     # Check recovered DAG
@@ -252,8 +254,9 @@ def test_get_weights_and_mask():
     learner.adjacency_matrix = jnp.array(
         [[0.0, 0.5, 0.2], [0.0, 0.0, 0.7], [0.0, 0.0, 0.0]]
     )
-    # constraint_mask is set by sink_node during __init__ (node 2 is sink)
-    # expected mask is [[1., 1., 1.], [1., 1., 1.], [0., 0., 0.]] at internal indices
+    # constraint_mask is set by sink_node during __init__ (node 2 is sink).
+    # Expected mask is [[1., 1., 1.], [1., 1., 1.], [0., 0., 0.]] at
+    # internal indices.
     W = learner.get_weights()
     expected_W = jnp.array([[0.0, 0.5, 0.2], [0.0, 0.0, 0.7], [0.0, 0.0, 0.0]])
     npt.assert_allclose(W, expected_W, atol=1e-6)
@@ -310,7 +313,6 @@ def test_to_graph_constructs_correct_dag():
 
 def test_auto_mfnet_single_node_pipeline(key):
     # Tests a single-node setup with AutoMFNet
-    d = 1
     x, y = jnp.array([[1.0], [2.0]]), jnp.array([[2.0], [4.0]])
 
     model0 = init_linear_model(key, d_in=1, d_out=1)
@@ -322,14 +324,14 @@ def test_auto_mfnet_single_node_pipeline(key):
 
     # AutoMFNet setup
     auto = AutoMFNet(sink_node=0)
-    learner = auto.fit_structure(
+    auto.fit_structure(
         node_ids=node_ids,
         base_models=base_models_map,
         structure_data=structure_data,
         n_iters=100,
     )
 
-    # leaf_model_fn and edge_model_fn now accept external node ID (Any)
+    # leaf_model_fn and edge_model_fn now accept external node ID
     def leaf_model_fn(nid: Any, dim: int):
         return init_linear_model(
             jax.random.PRNGKey(hash(nid)), d_in=dim, d_out=dim
@@ -380,18 +382,18 @@ def test_auto_mfnet_two_node_no_edge(key):
         2: (x2, y2),
     }  # Map external ID to parameter fitting data
 
-    # AutoMFNet setup: force sparsity to get no edges. sink_node=2 (external ID)
+    # AutoMFNet setup: force sparsity to get no edges. sink_node=2 (external ID).
     auto = AutoMFNet(
         sink_node=2, alpha=0.0, beta=1.0
     )  # beta=1.0 promotes sparsity
-    learner = auto.fit_structure(
+    auto.fit_structure(
         node_ids=node_ids,
         base_models=base_models_map,
         structure_data=structure_data,
         n_iters=1000,
     )
 
-    # leaf_model_fn and edge_model_fn now accept external node ID (Any)
+    # leaf_model_fn and edge_model_fn now accept external node ID
     def leaf_model_fn(nid: Any, dim: int):
         return init_linear_model(
             jax.random.PRNGKey(hash(nid)), d_in=dim, d_out=dim

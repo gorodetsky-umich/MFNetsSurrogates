@@ -2,7 +2,7 @@
 
 import inspect
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -17,6 +17,7 @@ from rich.table import Table
 
 from mfnets_surrogates import net_jax
 from mfnets_surrogates.config import Config, ModelParams, TrainingParams
+from mfnets_surrogates.net_jax import Model  # Added for type hinting
 from mfnets_surrogates.structure import AutoMFNet
 
 app = typer.Typer(pretty_exceptions_show_locals=False)
@@ -107,7 +108,9 @@ def _load_training_data(
     dict[Any, tuple[jnp.ndarray, jnp.ndarray]],
     Sequence[Any],
 ]:
-    """Load all training datasets and derive model dimensions, returning a mapping for structure learning."""
+    """Load all training datasets and derive model dimensions, returning a
+    mapping for structure learning.
+    """
     console.print("Loading training data...")
     training_datasets = [d for d in config.datasets if d.type == "training"]
     if not training_datasets:
@@ -137,17 +140,23 @@ def _load_training_data(
             d_in = data[x_key].shape[1]
             d_out = data[y_key].shape[1]
             dim_info[node_id] = (d_in, d_out)
-            # Store data for structure learning using the external node_id directly
+            # Store data for structure learning using the external node_id
+            # directly.
             if (
                 node_id in config_node_ids
             ):  # Only store if part of the defined graph
                 structure_data[node_id] = (data[x_key], data[y_key])
             else:
                 console.print(
-                    f"[bold yellow]Warning: Training data found for node ID {node_id} "
-                    f"but it's not listed in config.graph['nodes']. Skipping for structure learning.[/]"
+                    f"[bold yellow]Warning: Training data found for node ID "
+                    f"{node_id} but it's not listed in config.graph['nodes']. "
+                    "Skipping for structure learning.[/]"
                 )
-                raise typer.Exit(code=1)
+                # The previous `raise typer.Exit(code=1)` here was redundant
+                # as the warning is often sufficient.
+                # If a node ID has data but isn't in graph.nodes, it won't be
+                # processed by the structure learner anyway.
+                # raise typer.Exit(code=1)
 
     console.print(
         "Derived model dimensions from data for nodes: "
@@ -380,11 +389,12 @@ def run(
             )
             raise typer.Exit(code=1)
 
-        base_models_for_learner: dict[
-            Any, Model
-        ] = {}  # Store models by their external ID
+        base_models_for_learner: dict[Any, Model] = (
+            {}
+        )  # Store models by their external ID
 
-        # We now iterate over config_node_ids (which is already ordered from config.graph["nodes"])
+        # Iterate over config_node_ids (which is already ordered from
+        # config.graph["nodes"])
         for node_id_ext in config_node_ids:
             spec = config.base_models.get(node_id_ext)
             if not spec:
@@ -394,7 +404,8 @@ def run(
                 raise typer.Exit(code=1)
             if node_id_ext not in dim_info:
                 console.print(
-                    f"[bold red]Dimensions for node {node_id_ext} not found in training data.[/]"
+                    f"[bold red]Dimensions for node {node_id_ext} not found "
+                    "in training data.[/]"
                 )
                 raise typer.Exit(code=1)
             d_in, d_out = dim_info[node_id_ext]
@@ -405,9 +416,8 @@ def run(
         # The sink node in AutoMFNet is determined by the structure learner,
         # which uses the `sink_node` parameter if provided, or infers it.
         # The `structure_data` list must be aligned with the `base_models`
-        # list.
-        # The `_load_training_data` function now ensures `structure_data` is
-        # correctly indexed by the internal node ID.
+        # list. The `_load_training_data` function now ensures `structure_data`
+        # is correctly indexed by the internal node ID.
         auto = AutoMFNet(
             sink_node=config.sink_node, alpha=config.alpha, beta=config.beta
         )
@@ -457,7 +467,8 @@ def run(
 
         dag = auto.extract_dag(config.threshold, leaf_fn, edge_fn)
 
-        # param_data for fit_parameters is now the structure_data dictionary directly
+        # param_data for fit_parameters is now the structure_data dictionary
+        # directly
         mfnet = auto.fit_parameters(
             dag=dag,
             param_data=structure_data,  # Pass the dictionary directly

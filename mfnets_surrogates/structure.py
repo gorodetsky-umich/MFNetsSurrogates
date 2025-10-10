@@ -38,12 +38,13 @@ class MFNetStructureLearner:
 
         Args:
             node_ids: A sequence of identifiers for the nodes in the graph.
-                      The order defines the internal 0-indexed mapping used for adjacency.
-            base_models: A list of Model instances for δ_j outputs.
-                         Must be ordered corresponding to `node_ids`.
-            sink_node: Identifier of a node to force as sink (no outgoing edges).
-                       Must be one of the `node_ids`. If None, no node is explicitly
-                       masked as a sink.
+                      The order defines the internal 0-indexed mapping used for
+                      adjacency.
+            base_models: A list of Model instances for δ_j outputs. Must be
+                         ordered corresponding to `node_ids`.
+            sink_node: Identifier of a node to force as sink (no outgoing
+                       edges). Must be one of the `node_ids`. If None, no node
+                       is explicitly masked as a sink.
             alpha: Weight for acyclicity penalty.
             beta: Weight for L1 sparsity penalty.
         """
@@ -120,12 +121,12 @@ class MFNetStructureLearner:
             model = tdef.unflatten(m_leaves)
             base_models.append(model)
 
-        # Reconstruct with the actual node_ids and base_models
-        # Sink node is implicitly handled by the constraint_mask
+        # Reconstruct with the actual node_ids and base_models.
+        # Sink node is implicitly handled by the constraint_mask.
         inst = cls(
             node_ids=node_ids,  # Pass node_ids for internal mapping reconstruction
             base_models=base_models,
-            sink_node=None,  # When unflattening, the sink is encoded in constraint_mask
+            sink_node=None,  # When unflattening, sink is encoded in mask
             alpha=alpha,
             beta=beta,
         )
@@ -141,8 +142,8 @@ class MFNetStructureLearner:
         """
         # Shortcut for single node: just return its raw output
         if self.n_nodes == 1:
-            # mypy: explicit cast to satisfy static checker
-            # This relies on base_models[0] being the only model, which aligns with node_ids[0]
+            # mypy: explicit cast to satisfy static checker. This relies on
+            # base_models[0] being the only model, which aligns with node_ids[0].
             return cast(jnp.ndarray, self.base_models[0].run(x_input))
 
         # 1) Compute each base-model output δ_j(x) with shape (batch, d_j)
@@ -185,7 +186,8 @@ class MFNetStructureLearner:
         mse_total: jnp.ndarray = jnp.array(0.0)
         num_supervised_nodes = 0
 
-        # Iterate through internal node indices (j) and external node IDs (node_id_ext)
+        # Iterate through internal node indices (j) and external node IDs
+        # (node_id_ext)
         for j, node_id_ext in enumerate(self.idx_to_node):
             if node_id_ext in train_data:  # Check if this node has supervision
                 x_j, y_j = train_data[node_id_ext]
@@ -195,12 +197,13 @@ class MFNetStructureLearner:
 
                 if (
                     self.n_nodes == 1
-                ):  # Special case for a single node, run() returns (batch, d) directly
+                ):  # Special case for a single node, run() returns (batch, d)
                     # Make sure F has the correct batch and feature dimensions
                     pred_j = F
                 else:  # Multi-node case
                     d_j = y_j.shape[-1]
-                    # F has shape (n_nodes, batch, max_dim), select for node j and trim padding
+                    # F has shape (n_nodes, batch, max_dim), select for node j
+                    # and trim padding
                     pred_j = F[j, :, :d_j]
 
                 mse_total += jnp.mean((pred_j - y_j) ** 2)
@@ -236,7 +239,8 @@ class MFNetStructureLearner:
         """
         if not train_data and self.n_nodes > 0:
             raise ValueError(
-                "train_data cannot be empty when learning structure for multiple nodes."
+                "train_data cannot be empty when learning structure for "
+                "multiple nodes."
             )
         optimizer = optax.adam(learning_rate)
         state = optimizer.init(self)
@@ -257,7 +261,7 @@ class MFNetStructureLearner:
             return model, opt_state, loss
 
         model = self
-        for step_idx in range(n_iters):
+        for _step_idx in range(n_iters):  # Renamed step_idx to _step_idx
             model, state, _ = train_step(
                 model, state, train_data
             )  # Pass train_data to the jitted step
@@ -273,12 +277,12 @@ class MFNetStructureLearner:
         return jnp.abs(W) > threshold
 
     def to_graph(self, threshold: float) -> nx.DiGraph:
-        """
-        Convert learned structure to a NetworkX DAG with associated base models.
+        """Convert learned structure to a NetworkX DAG with associated base
+        models.
 
-        The nodes in the returned graph will use the external node IDs stored in
-        `self.node_ids`, and each node will have an attribute 'func' containing
-        its corresponding base model from `self.base_models`.
+        The nodes in the returned graph will use the external node IDs stored
+        in `self.node_ids`, and each node will have an attribute 'func'
+        containing its corresponding base model from `self.base_models`.
         """
         mask = self.adjacency_mask(threshold)
         G = nx.DiGraph()
@@ -349,13 +353,15 @@ class AutoMFNet:
             base_models  # Store the map of base models by external ID
         )
 
-        # Create an ordered list of base models based on node_ids for the learner's __init__
+        # Create an ordered list of base models based on node_ids for the
+        # learner's __init__
         ordered_base_models = [base_models[nid] for nid in node_ids]
 
         # Choose sink_node: user-supplied or highest-fidelity supervised node
         primary_sink_id = self.sink_node
         if primary_sink_id is None:
-            # Find the last node in the provided node_ids sequence that has training data
+            # Find the last node in the provided node_ids sequence that has
+            # training data
             supervised_node_ids = [
                 nid for nid in node_ids if nid in structure_data
             ]
@@ -398,12 +404,14 @@ class AutoMFNet:
         ):  # pragma: no cover
             raise RuntimeError("fit_structure() must be called first.")
 
-        # `to_graph` now returns a graph with arbitrary external node IDs and base models as funcs
+        # `to_graph` now returns a graph with arbitrary external node IDs and
+        # base models as funcs
         G = self.learner.to_graph(threshold=threshold)
 
         # Replace base models with leaf/edge models using the provided functions
         for nid in G.nodes:  # Iterate over external node IDs
-            # Lookup the original base model's output dimension using the external ID
+            # Lookup the original base model's output dimension using the
+            # external ID
             original_base_model = self.base_models_map[nid]
             node_dim = original_base_model.output_dim()
             parent_ids = list(G.predecessors(nid))
@@ -434,15 +442,19 @@ class AutoMFNet:
         verbose: bool = True,
         log_every: int = 100,
     ) -> MFNetJax:
-        """Train the full-fidelity DAG by fitting its parameters with MFNetJax.fit."""
-        # Need to convert param_data dict to a list ordered by dag nodes for MFNetJax.fit
+        """Train the full-fidelity DAG by fitting its parameters with
+        MFNetJax.fit.
+        """
+        # Need to convert param_data dict to a list ordered by dag nodes for
+        # MFNetJax.fit
         ordered_param_data = []
         for node_id_ext in sorted(
             dag.nodes
         ):  # Ensure a consistent order for MFNetJax.fit
             if node_id_ext not in param_data:
                 raise ValueError(
-                    f"Training data missing for node {node_id_ext} required by DAG for parameter fitting."
+                    f"Training data missing for node {node_id_ext} required "
+                    "by DAG for parameter fitting."
                 )
             ordered_param_data.append(param_data[node_id_ext])
 
