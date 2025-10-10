@@ -125,8 +125,8 @@ class MFNetStructureLearner:
         # Sink node is implicitly handled by the constraint_mask.
         inst = cls(
             node_ids=node_ids,  # Pass node_ids for internal mapping reconstruction
-            base_models=base_models,  # When unflattening, sink is encoded in mask
-            sink_node=None,
+            base_models=base_models,
+            sink_node=None,  # Sink is encoded in mask during unflattening
             alpha=alpha,
             beta=beta,
         )
@@ -148,8 +148,8 @@ class MFNetStructureLearner:
 
         # 1) Compute each base-model output δ_j(x) with shape (batch, d_j)
         outputs = [m.run(x_input) for m in self.base_models]
-        dims = [o.shape[-1] for o in outputs]  # type: ignore
-        max_dim = max(dims)  # type: ignore
+        dims = [o.shape[-1] for o in outputs]  # type: ignore # noqa: E501
+        max_dim = max(dims)  # type: ignore # noqa: E501
 
         # 2) Pad each δ_j to width max_dim along last axis
         padded = [
@@ -198,8 +198,8 @@ class MFNetStructureLearner:
 
                 if (
                     self.n_nodes == 1
-                ):  # Special case for a single node, run() returns (batch, d)
-                    # Make sure F has the correct batch and feature dimensions
+                ):  # Special case for a single node, run() returns (batch, d).
+                    # Make sure F has the correct batch and feature dimensions.
                     pred_j = F  # type: ignore
                 else:  # Multi-node case
                     d_j = y_j.shape[-1]  # type: ignore
@@ -278,9 +278,9 @@ class MFNetStructureLearner:
         return jnp.abs(W) > threshold
 
     def to_graph(self, threshold: float) -> nx.DiGraph:
-        """Convert learned structure to a NetworkX DAG.
+        """Convert the learned structure to a NetworkX DAG.
 
-        It associates base models with nodes, using external node IDs and their
+        Associates base models with nodes, using external node IDs and their
         corresponding `base_models` from `self.base_models`.
         """
         mask = self.adjacency_mask(threshold)
