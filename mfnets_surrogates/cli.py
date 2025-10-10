@@ -413,10 +413,6 @@ def run(
     """Build, train, and run predictions for an MFNets surrogate model."""
     config = _load_and_validate_config(config_path)
     key = jax.random.PRNGKey(42)
-    training_data, dim_info, structure_data, config_node_ids = (
-        _load_training_data(config)
-    )
-
     if config.mode.lower() == "auto":
         if not (
             config.base_models and config.leaf_model and config.edge_model
@@ -426,6 +422,9 @@ def run(
             )
             raise typer.Exit(code=1)
 
+        training_data, dim_info, structure_data, config_node_ids = (
+            _load_training_data(config)
+        )
         base_models_for_learner: dict[
             Any, Model
         ] = {}  # Store models by their external ID
@@ -521,7 +520,10 @@ def run(
 
         _process_prediction_tasks(mfnet, config)
         console.print("\n[bold green]Auto mode completed successfully.[/]")
-    else:
+    else:  # Fixed mode
+        training_data, dim_info, structure_data, config_node_ids = (
+            _load_training_data(config)
+        )
         mfnet = _build_mfnet_from_config(config, dim_info)
         trained_mfnet = _train_network(
             mfnet, training_data, config.training, config
