@@ -143,3 +143,8 @@ If you use this code in your research, please cite the original paper:
 ## **License**
 
 This project is licensed under the **MIT License**.
+
+## Future Work
+
+-   [ ] Add comprehensive unit tests for the Command-Line Interface
+    (`mfnets_surrogates/cli.py`).
