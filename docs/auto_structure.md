@@ -70,11 +70,18 @@ x = jax.random.normal(key, (128, d_in))
 y_hf = jnp.sin(jnp.sum(x, -1, keepdims=True))
 
 # Stage-1 base models (linear)
-bases = [init_linear_model(key, d_in, d_out) for _ in range(3)]
+node_ids = [0, 1, 2]
+bases = {i: init_linear_model(key, d_in, d_out) for i in node_ids}
 auto = AutoMFNet(sink_node=2, alpha=0.5, beta=0.05)
 
 # structure_data: only highest-fidelity node (2) supervised
-auto.fit_structure(bases, [None, None, (x, y_hf)], n_iters=2000)
+structure_data = {2: (x, y_hf)}
+auto.fit_structure(
+    node_ids=node_ids,
+    base_models=bases,
+    structure_data=structure_data,
+    n_iters=2000,
+)
 
 # Build DAG with factories
 leaf_fn = lambda nid, dim: init_mlp_model(key, [d_in, 32, dim])
@@ -83,8 +90,9 @@ edge_fn = lambda nid, dim, pd: init_mlp_enhancement_model(
 )
 dag = auto.extract_dag(0.1, leaf_fn, edge_fn)
 
-# Stage-2 training
-mfnet = auto.fit_parameters(dag, [None, None, (x, y_hf)], n_iters=5000)
+# Stage-2 training: data can be a subset of structure_data
+param_data = {2: (x, y_hf)}
+mfnet = auto.fit_parameters(dag, param_data, n_iters=5000)
 print("final MSE", jnp.mean((mfnet.run((2,), x)[0] - y_hf) ** 2))
 ```
 
