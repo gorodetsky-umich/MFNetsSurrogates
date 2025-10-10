@@ -300,23 +300,36 @@ class AutoMFNet:
         if self.learner is None:
             raise RuntimeError("You must call fit_structure(...) first.")
 
-        node_ids = list(range(self.learner.n_nodes))
+        # The external node IDs are typically 1-indexed in the CLI and config.
+        # This change maps the internal 0-indexed learner nodes to 1-indexed external IDs
+        # when constructing the NetworkX graph.
+        node_ids_for_graph = list(range(1, self.learner.n_nodes + 1))
 
         # Guard: fit_structure must have populated self.base_models
         if self.base_models is None:  # pragma: no cover
             raise RuntimeError("fit_structure() must be called first.")
         base_models: list[Model] = self.base_models
 
+        # Create a mapping from the new 1-indexed node IDs to the original 0-indexed base models
+        node_funcs_map = {
+            new_id: base_models[idx]
+            for idx, new_id in enumerate(node_ids_for_graph)
+        }
+
         # create initial graph with placeholder funcs (use base models)
         G = self.learner.to_graph(
-            node_ids=node_ids,
-            node_funcs={nid: base_models[nid] for nid in node_ids},
+            node_ids=node_ids_for_graph,
+            node_funcs=node_funcs_map,
             threshold=threshold,
         )
         for nid in G.nodes:
-            node_dim = base_models[nid].output_dim()
+            # Adjust index for base_models lookup (node_ids_for_graph are 1-based, base_models is 0-based)
+            original_idx = nid - 1
+            node_dim = base_models[original_idx].output_dim()
             parent_ids = list(G.predecessors(nid))
-            parent_dims = [base_models[p].output_dim() for p in parent_ids]
+            parent_dims = [
+                base_models[p_id - 1].output_dim() for p_id in parent_ids
+            ]
             if not parent_ids:
                 G.nodes[nid]["func"] = leaf_model_fn(nid, node_dim)
             else:

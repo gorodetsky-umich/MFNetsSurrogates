@@ -64,8 +64,11 @@ def _instantiate_model(
     """Instantiate a model based on the specification."""
     # Case-insensitive lookup so "PCEModel" == "pcemodel"
     initializer = next(
-        (fn for name, fn in MODEL_INITIALIZERS.items()
-         if name.lower() == spec.type.lower()),
+        (
+            fn
+            for name, fn in MODEL_INITIALIZERS.items()
+            if name.lower() == spec.type.lower()
+        ),
         None,
     )
     if initializer is None:
@@ -112,11 +115,16 @@ def _load_training_data(
 
     all_data = {}
     dim_info = {}
-    structure_data = [None] * len(config.graph["nodes"])
-    for _idx, dataset in enumerate(training_datasets):
+    # Initialize structure_data with None for all nodes, assuming nodes are 0-indexed internally
+    num_nodes = len(config.graph["nodes"])
+    structure_data = [None] * num_nodes
+
+    for dataset in training_datasets:
         data = jnp.load(dataset.data_path)
         all_data[dataset.name] = data
         for node_id in dataset.nodes:
+            # Ensure node_id is treated as an integer for indexing
+            node_idx = int(node_id)
             x_key = f"x_train_{node_id}"
             y_key = f"y_train_{node_id}"
             if x_key not in data or y_key not in data:
@@ -128,13 +136,20 @@ def _load_training_data(
             d_in = data[x_key].shape[1]
             d_out = data[y_key].shape[1]
             dim_info[node_id] = (d_in, d_out)
+
+            # Store data for structure learning, ensuring correct index
+            if 0 <= node_idx < num_nodes:
+                structure_data[node_idx] = (data[x_key], data[y_key])
+            else:
+                console.print(
+                    f"[bold red]Error: Node ID {node_id} is out of bounds "
+                    f"for structure_data indexing (0 to {num_nodes - 1}).[/]"
+                )
+                raise typer.Exit(code=1)
+
     console.print(
         "Derived model dimensions from data for nodes: "
         f"{list(dim_info.keys())}"
-    )
-    structure_data[_idx] = (
-        data[f"x_train_{dataset.nodes[0]}"],
-        data[f"y_train_{dataset.nodes[0]}"],
     )
     return all_data, dim_info, structure_data
 
@@ -290,7 +305,9 @@ def _process_prediction_tasks(mfnet: net_jax.MFNetJax, config: Config) -> None:
         console.print(f"Generating predictions for node: {target_node}")
 
         if target_node not in mfnet.graph.nodes:
-            console.print(f"[red]Node {target_node} not in trained graph![/red]")
+            console.print(
+                f"[red]Node {target_node} not in trained graph![/red]"
+            )
             raise typer.Exit(code=1)
         (y_predict,) = mfnet.run((target_node,), x_predict)
         console.print(f"Generated predictions with shape {y_predict.shape}")
@@ -361,7 +378,13 @@ def run(
 
         base_models = []
         dims_seq = []
-        for node_id in sorted(config.graph["nodes"]):
+        # The node IDs from config.graph["nodes"] are used to determine the order
+        # and number of base models. These are assumed to be 0-indexed internally
+        # for the structure learner.
+        sorted_node_ids = sorted(config.graph["nodes"])
+        num_internal_nodes = len(sorted_node_ids)
+
+        for node_id in sorted_node_ids:
             spec = config.base_models.get(node_id)
             if not spec:
                 console.print(
@@ -370,14 +393,21 @@ def run(
                 raise typer.Exit(code=1)
             d_in, d_out = dim_info[node_id]
             key, sub = jax.random.split(key)
+            # Instantiate base models with d_parent=0 as they are not yet part of the DAG
             base_models.append(_instantiate_model(spec, d_in, d_out, 0, sub))
             dims_seq.append((d_in, d_out))
 
-        sink_node = max(config.graph["nodes"])
-        auto = AutoMFNet(sink_node, alpha=config.alpha, beta=config.beta)
+        # The sink node in AutoMFNet is determined by the structure learner,
+        # which uses the `sink_node` parameter if provided, or infers it.
+        # The `structure_data` list must be aligned with the `base_models` list.
+        # The `_load_training_data` function now ensures `structure_data` is
+        # correctly indexed by the internal node ID.
+        auto = AutoMFNet(
+            sink_node=config.sink_node, alpha=config.alpha, beta=config.beta
+        )
         auto.fit_structure(
             base_models,
-            structure_data,
+            structure_data,  # This is now correctly indexed
             n_iters=config.training.num_steps,
             learning_rate=config.training.learning_rate,
         )
@@ -385,14 +415,30 @@ def run(
         leaf_tpl = config.leaf_model
 
         def leaf_fn(nid: int, dim: int):
-            d_in, _ = dims_seq[nid]
+            # nid here is the 1-based external ID from the DAG.
+            # We need to map it back to the 0-based index for dims_seq.
+            original_idx = nid - 1
+            if not (0 <= original_idx < len(dims_seq)):
+                console.print(
+                    f"[bold red]Invalid node ID {nid} for leaf_fn.[/]"
+                )
+                raise typer.Exit(code=1)
+            d_in, _ = dims_seq[original_idx]
             key_l = jax.random.PRNGKey(1000 + nid)
             return _instantiate_model(leaf_tpl, d_in, dim, 0, key_l)
 
         edge_tpl = config.edge_model
 
         def edge_fn(nid: int, dim: int, parent_dims: list[int]):
-            d_in, _ = dims_seq[nid]
+            # nid here is the 1-based external ID from the DAG.
+            # We need to map it back to the 0-based index for dims_seq.
+            original_idx = nid - 1
+            if not (0 <= original_idx < len(dims_seq)):
+                console.print(
+                    f"[bold red]Invalid node ID {nid} for edge_fn.[/]"
+                )
+                raise typer.Exit(code=1)
+            d_in, _ = dims_seq[original_idx]
             key_e = jax.random.PRNGKey(2000 + nid)
             return _instantiate_model(
                 edge_tpl, d_in, dim, sum(parent_dims), key_e
@@ -400,7 +446,36 @@ def run(
 
         dag = auto.extract_dag(config.threshold, leaf_fn, edge_fn)
 
-        param_data = [data for data in structure_data if data is not None]
+        # param_data should be the actual training data, not structure_data
+        # We need to reload the training data specifically for parameter fitting.
+        # Assuming the first training dataset in the config is the one to use.
+        training_dataset_for_fit = next(
+            (d for d in config.datasets if d.type == "training"), None
+        )
+        if not training_dataset_for_fit:
+            console.print(
+                "[bold red]No training dataset found for parameter fitting.[/]"
+            )
+            raise typer.Exit(code=1)
+
+        data_for_fit = jnp.load(training_dataset_for_fit.data_path)
+        param_data = []
+        # Ensure the order of param_data matches the order of nodes in the DAG
+        # The DAG nodes are typically 1-indexed external IDs.
+        sorted_dag_node_ids = sorted(dag.nodes)
+        for node_id_ext in sorted_dag_node_ids:
+            # Map external ID back to the key used in the data file
+            node_id_str = str(node_id_ext)
+            x_key = f"x_train_{node_id_str}"
+            y_key = f"y_train_{node_id_str}"
+            if x_key not in data_for_fit or y_key not in data_for_fit:
+                console.print(
+                    f"[bold red]Data key not found for node {node_id_ext} "
+                    f"in {training_dataset_for_fit.data_path}[/]"
+                )
+                raise typer.Exit(code=1)
+            param_data.append((data_for_fit[x_key], data_for_fit[y_key]))
+
         mfnet = auto.fit_parameters(
             dag,
             param_data,
