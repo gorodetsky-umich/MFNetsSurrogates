@@ -63,7 +63,9 @@ class Config(BaseModel):
     )
     sink_node: Any | None = Field(
         default=None,
-        description="Node ID to force as sink (no outgoing edges) in auto mode.",
+        description=(
+            "Node ID to force as sink (no outgoing edges) in auto mode."
+        ),
     )
 
     # Optional model templates used exclusively in auto mode
