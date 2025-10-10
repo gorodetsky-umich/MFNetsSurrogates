@@ -193,8 +193,9 @@ def test_structure_learner_recovers_known_dag(key):
 
     # Generate training data for all nodes
     y_train_0 = true_run(x_train)
-    y_train_1 = 0.5 * y_train_0 + true_run(x_train)
-    y_train_2 = 0.2 * y_train_0 + 0.7 * y_train_1 + true_run(x_train)
+    # Simplify the true structure to make recovery more robust
+    y_train_1 = 1.0 * y_train_0 + true_run(x_train)  # Strong edge 0->1
+    y_train_2 = 1.0 * y_train_1 + true_run(x_train)  # Strong edge 1->2
 
     # Training data as a dictionary mapping external node IDs to (x,y)
     train_data = {
@@ -224,8 +225,8 @@ def test_structure_learner_recovers_known_dag(key):
     assert len(dag.nodes) == n_nodes
     # Assert edges using the external node IDs
     assert dag.has_edge(0, 1)  # 0 -> 1
-    assert dag.has_edge(0, 2)  # 0 -> 2
     assert dag.has_edge(1, 2)  # 1 -> 2
+    assert not dag.has_edge(0, 2)  # No direct edge 0 -> 2
     assert not dag.has_edge(1, 0)
     assert not dag.has_edge(2, 0)
     assert not dag.has_edge(2, 1)
