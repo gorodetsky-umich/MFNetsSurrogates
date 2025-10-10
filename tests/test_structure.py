@@ -309,6 +309,34 @@ def test_to_graph_constructs_correct_dag():
     assert dag.nodes[10]["func"] is mock_model  # Check base model is attached
 
 
+def test_structure_learner_sparsity_penalty(key):
+    """Test that a high beta (sparsity) penalty suppresses edge formation."""
+    k0, k1, k_data = jax.random.split(key, 3)
+    d_in, d_out = 1, 1
+
+    # Create data where a 0->1 edge is strongly suggested
+    x_train = jax.random.normal(k_data, (100, d_in))
+    y0 = 2 * x_train
+    y1 = 0.8 * y0 + (x_train**2)
+    train_data = {0: (x_train, y0), 1: (x_train, y1)}
+
+    # Use simple base models
+    m0 = init_linear_model(k0, d_in, d_out)
+    m1 = init_linear_model(k1, d_in, d_out)
+    base_models = [m0, m1]
+    node_ids = [0, 1]
+
+    # Train with a very high beta, which should force W to be near zero
+    learner = MFNetStructureLearner(
+        node_ids=node_ids, base_models=base_models, sink_node=1, beta=100.0
+    )
+    learner = learner.fit(train_data, n_iters=1000, learning_rate=1e-2)
+
+    # The adjacency matrix should have very small values
+    W = learner.get_weights()
+    npt.assert_allclose(W, 0.0, atol=1e-2)
+
+
 # ----------------------------------------------------------------------
 # Tests for AutoMFNet end-to-end pipeline
 
