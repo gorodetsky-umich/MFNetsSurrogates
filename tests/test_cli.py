@@ -135,10 +135,7 @@ datasets:
 def test_cli_load_training_data_node_not_in_graph_warning(
     cli_config_dir: Path, dummy_training_data_npz: Path
 ):
-    """Test _load_training_data warns if node data is present but not in
-    config.graph['nodes'].
-
-    """
+    """Test _load_training_data warns if node data is not in config.graph['nodes']."""
     config_content = f"""
 mode: fixed
 graph:
@@ -171,10 +168,7 @@ datasets:
 def test_cli_run_auto_mode_sink_node_inference(
     mock_auto_mfnet_cls, minimal_auto_config_path: Path
 ):
-    """Test auto mode correctly infers sink_node when not specified in
-    config.
-
-    """
+    """Test auto mode infers sink_node correctly when not specified."""
     # Modify config to remove sink_node explicitly
     config_content = minimal_auto_config_path.read_text()
     config_content = config_content.replace("sink_node: 3", "")

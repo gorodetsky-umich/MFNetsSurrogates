@@ -470,7 +470,7 @@ class AutoMFNet:
         verbose: bool = True,
         log_every: int = 100,
     ) -> MFNetJax:
-        """Train the full-fidelity DAG by fitting its parameters with MFNetJax.fit.
+        """Train the full-fidelity DAG by fitting parameters with MFNetJax.
 
         Args:
             dag: The discovered and processed DAG with leaf/edge models.
