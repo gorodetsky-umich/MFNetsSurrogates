@@ -389,9 +389,9 @@ def run(
             )
             raise typer.Exit(code=1)
 
-        base_models_for_learner: dict[Any, Model] = (
-            {}
-        )  # Store models by their external ID
+        base_models_for_learner: dict[
+            Any, Model
+        ] = {}  # Store models by their external ID
 
         # Iterate over config_node_ids (which is already ordered from
         # config.graph["nodes"])
