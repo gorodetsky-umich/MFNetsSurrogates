@@ -1,7 +1,7 @@
 # Makefile for MFNetsSurrogates project
 
 .DEFAULT_GOAL := help
-.PHONY: help install install-dev lint format check check-format type-check test clean ci docs run-example run-mlp-graph run-pce-graph run-cli-example
+.PHONY: help install install-dev lint format check check-format type-check test clean ci docs run-example run-mlp-graph run-pce-graph run-cli-example run-simple-mfnet
 
 # ==============================================================================
 # Installation
@@ -69,6 +69,10 @@ run-mlp-graph: ## Run an example showing MLP nodes with multiple graphs
 run-pce-graph: ## Run an example showing PCE nodes with multiple graphs on MLP truth
 	@echo "--> Running PCE graph example..."
 	@python examples/pce_graphs_with_mlp_truth.py
+
+run-simple-mfnet: ## Run a simple example using MFNetJax.fit() directly
+	@echo "--> Running simple MFNetJax.fit() example..."
+	@python examples/simple_mfnet.py
 
 run-cli-example: ## Run the full CLI tool example (fixed graph)
 	@echo "--> Generating data for CLI example..."
