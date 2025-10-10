@@ -124,7 +124,8 @@ def test_cli_load_training_data_missing_keys(
     cli_config_dir: Path, dummy_prediction_data_npz: Path
 ):
     """Test _load_training_data with a NPZ missing expected keys."""
-    # This config is valid, so parsing will succeed, but data loading will fail.
+    # This config is valid, so parsing will succeed, but data loading will
+    # fail.
     config_content = f"""
 mode: fixed
 graph:
@@ -155,7 +156,8 @@ def test_cli_load_training_data_node_not_in_graph_warning(
     cli_config_dir: Path, dummy_training_data_npz: Path
 ):
     """Test _load_training_data warns if node data is not in graph['nodes']."""
-    # This config is valid, so parsing will succeed, but data loading will warn.
+    # This config is valid, so parsing will succeed, but data loading will
+    # warn.
     config_content = f"""
 mode: fixed
 graph:
