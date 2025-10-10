@@ -135,7 +135,7 @@ datasets:
 def test_cli_load_training_data_node_not_in_graph_warning(
     cli_config_dir: Path, dummy_training_data_npz: Path
 ):
-    """Test _load_training_data warns if node data is not in config.graph['nodes']."""
+    """Test _load_training_data warns if node data is not in graph['nodes']."""
     config_content = f"""
 mode: fixed
 graph:
