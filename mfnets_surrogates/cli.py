@@ -434,15 +434,16 @@ def run(
         def leaf_fn(nid: Any, dim: int):  # nid is now Any, the external ID
             if nid not in dim_info:
                 console.print(
-                    f"[bold red]Dimensions for node {nid} not found for leaf_fn.[/]"
+                    f"[bold red]Dimensions for node {nid} not found for "
+                    "leaf_fn.[/]"
                 )
                 raise typer.Exit(code=1)
             d_in, _ = dim_info[
                 nid
-            ]  # Lookup dimensions directly using external nid
+            ]  # Lookup dimensions directly using external nid.
             key_l = jax.random.PRNGKey(
                 1000 + hash(nid) % (2**31 - 1)
-            )  # Use hash for non-int nid
+            )  # Use hash for non-int nid.
             return _instantiate_model(leaf_tpl, d_in, dim, 0, key_l)
 
         edge_tpl = config.edge_model
@@ -452,15 +453,16 @@ def run(
         ):  # nid is now Any
             if nid not in dim_info:
                 console.print(
-                    f"[bold red]Dimensions for node {nid} not found for edge_fn.[/]"
+                    f"[bold red]Dimensions for node {nid} not found for "
+                    "edge_fn.[/]"
                 )
                 raise typer.Exit(code=1)
             d_in, _ = dim_info[
                 nid
-            ]  # Lookup dimensions directly using external nid
+            ]  # Lookup dimensions directly using external nid.
             key_e = jax.random.PRNGKey(
                 2000 + hash(nid) % (2**31 - 1)
-            )  # Use hash for non-int nid
+            )  # Use hash for non-int nid.
             return _instantiate_model(
                 edge_tpl, d_in, dim, sum(parent_dims), key_e
             )
