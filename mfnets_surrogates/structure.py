@@ -409,16 +409,19 @@ class AutoMFNet:
         """Prune W at threshold and build a DAG with full models.
 
         Args:
-            threshold: Threshold to prune edges from the learned adjacency matrix.
-            leaf_model_fn: A factory function `leaf_model_fn(node_id, node_dim) -> Model`
-                           to instantiate models for nodes that become leaves in the DAG.
-            edge_model_fn: A factory function `edge_model_fn(node_id, node_dim, parent_dims) -> Model`
-                           to instantiate models for nodes that have parents in the DAG.
+            threshold: Threshold to prune edges from the learned adjacency
+                matrix.
+            leaf_model_fn: A factory function
+                `leaf_model_fn(node_id, node_dim) -> Model` to instantiate
+                models for nodes that become leaves in the DAG.
+            edge_model_fn: A factory function
+                `edge_model_fn(node_id, node_dim, parent_dims) -> Model` to
+                instantiate models for nodes that have parents in the DAG.
 
         Returns
         -------
-            A NetworkX DiGraph representing the extracted DAG with instantiated
-            leaf and edge models.
+            A NetworkX DiGraph representing the extracted DAG with
+            instantiated leaf and edge models.
         """
         if self.learner is None:
             raise RuntimeError("You must call fit_structure(...) first.")
@@ -458,22 +461,25 @@ class AutoMFNet:
         self,
         dag: nx.DiGraph,
         param_data: Mapping[Any, tuple[jnp.ndarray, jnp.ndarray]],
-        # Mapping from external node IDs to (x, y) training data for parameter fitting.
+        # Mapping from external node IDs to (x, y) training data for
+        # parameter fitting.
         n_iters: int = 5000,
         learning_rate: float = 1e-3,
         loss_fn: Callable = mse_loss_graph,
         verbose: bool = True,
         log_every: int = 100,
     ) -> MFNetJax:
-        """Train the full-fidelity DAG by fitting its parameters with MFNetJax.fit.
+        """Train the full-fidelity DAG by fitting its parameters with
+        MFNetJax.fit.
 
         Args:
             dag: The discovered and processed DAG with leaf/edge models.
-            param_data: Mapping from external node IDs to (x, y) training data
-                        for parameter fitting.
+            param_data: Mapping from external node IDs to (x, y) training
+                data for parameter fitting.
             n_iters: Number of optimization iterations.
             learning_rate: Learning rate for the optimizer.
-            loss_fn: Loss function to use during training (default: mse_loss_graph).
+            loss_fn: Loss function to use during training (default:
+                mse_loss_graph).
             verbose: If True, display a progress bar.
             log_every: Interval at which to log the loss.
 

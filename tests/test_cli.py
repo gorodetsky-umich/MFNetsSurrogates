@@ -135,7 +135,9 @@ datasets:
 def test_cli_load_training_data_node_not_in_graph_warning(
     cli_config_dir: Path, dummy_training_data_npz: Path
 ):
-    """Test _load_training_data warns if node data is present but not in config.graph['nodes']."""
+    """Test _load_training_data warns if node data is present but not in
+    config.graph['nodes'].
+    """
     config_content = f"""
 mode: fixed
 graph:
@@ -155,12 +157,12 @@ datasets:
     config_path.write_text(config_content)
 
     result = runner.invoke(app, ["run", "--config", str(config_path)])
+    # It will exit because of node 3's data not being handled by the fixed
+    # graph
+    assert result.exit_code != 0
     assert (
-        result.exit_code != 0
-    )  # It will exit because of node 3's data not being handled by the fixed graph
-    assert (
-        "Warning: Training data found for node ID 3 but it's not listed in config.graph['nodes']"
-        in result.stdout
+        "Warning: Training data found for node ID 3 but it's not listed in "
+        "config.graph['nodes']" in result.stdout
     )
 
 
@@ -168,7 +170,9 @@ datasets:
 def test_cli_run_auto_mode_sink_node_inference(
     mock_auto_mfnet_cls, minimal_auto_config_path: Path
 ):
-    """Test auto mode correctly infers sink_node when not specified in config."""
+    """Test auto mode correctly infers sink_node when not specified in
+    config.
+    """
     # Modify config to remove sink_node explicitly
     config_content = minimal_auto_config_path.read_text()
     config_content = config_content.replace("sink_node: 3", "")
@@ -176,7 +180,8 @@ def test_cli_run_auto_mode_sink_node_inference(
 
     runner.invoke(app, ["run", "--config", str(minimal_auto_config_path)])
 
-    # Assert that AutoMFNet was instantiated with sink_node=3 (highest fidelity)
+    # Assert that AutoMFNet was instantiated with sink_node=3 (highest
+    # fidelity)
     mock_auto_mfnet_cls.assert_called_once_with(
         sink_node=3, alpha=1.0, beta=1.0
     )

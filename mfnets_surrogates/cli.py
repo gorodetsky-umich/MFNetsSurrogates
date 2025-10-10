@@ -67,7 +67,8 @@ def _instantiate_model(
     """Instantiate a model based on the specification.
 
     Args:
-        spec: A ModelParams object specifying the model type and its parameters.
+        spec: A ModelParams object specifying the model type and its
+            parameters.
         d_in: The primary input dimension of the node model.
         d_out: The output dimension of the node model.
         d_parent: The combined output dimension of all parent nodes, if any.
