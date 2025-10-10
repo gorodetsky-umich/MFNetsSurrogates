@@ -24,11 +24,13 @@ app = typer.Typer(pretty_exceptions_show_locals=False)
 console = Console()
 
 
-def _discover_initializers() -> dict[str, Callable[..., Any]]:
+def _discover_initializers() -> dict[str, Callable[..., Model]]:
     """Scan the net_jax module to find all model initializer functions."""
-    initializers: dict[str, Callable[..., Any]] = {}
+    initializers: dict[str, Callable[..., Model]] = {}
     for name, func in inspect.getmembers(net_jax, inspect.isfunction):
         if name.startswith("init_"):
+            # We assume initializers return a Model, which is consistent
+            # with the return type of _instantiate_model.
             model_name = name.replace("init_", "").replace("_", " ").title()
             model_name = model_name.replace(" ", "")
             initializers[model_name] = func
