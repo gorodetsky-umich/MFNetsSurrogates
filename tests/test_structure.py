@@ -382,7 +382,8 @@ def test_auto_mfnet_two_node_no_edge(key):
         2: (x2, y2),
     }  # Map external ID to parameter fitting data
 
-    # AutoMFNet setup: force sparsity to get no edges. sink_node=2 (external ID).
+    # AutoMFNet setup: force sparsity to get no edges.
+    # sink_node=2 (external ID).
     auto = AutoMFNet(
         sink_node=2, alpha=0.0, beta=1.0
     )  # beta=1.0 promotes sparsity

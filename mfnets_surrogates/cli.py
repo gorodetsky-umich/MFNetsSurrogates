@@ -110,7 +110,8 @@ def _load_training_data(
 ]:
     """Load training data, derive model dimensions, and return a mapping.
 
-    The mapping is from external node IDs to (x, y) tuples for structure learning.
+    The mapping is from external node IDs to (x, y) tuples for
+    structure learning.
     """
     console.print("Loading training data...")
     training_datasets = [d for d in config.datasets if d.type == "training"]

@@ -124,9 +124,11 @@ class MFNetStructureLearner:
         # Reconstruct with the actual node_ids and base_models.
         # Sink node is implicitly handled by the constraint_mask.
         inst = cls(
-            node_ids=node_ids,  # Pass node_ids for internal mapping reconstruction
+            node_ids=node_ids,
+            # Pass node_ids for internal mapping reconstruction
             base_models=base_models,
-            sink_node=None,  # Sink is encoded in mask during unflattening
+            # Sink is encoded in mask during unflattening
+            sink_node=None,
             alpha=alpha,
             beta=beta,
         )
@@ -142,8 +144,9 @@ class MFNetStructureLearner:
         """
         # Shortcut for single node: just return its raw output
         if self.n_nodes == 1:
-            # mypy: explicit cast to satisfy static checker. This relies on
-            # base_models[0] being the only model, which aligns with node_ids[0].
+            # mypy: explicit cast to satisfy static checker. This relies
+            # on base_models[0] being the only model, which aligns with
+            # node_ids[0].
             return cast(jnp.ndarray, self.base_models[0].run(x_input))
 
         # 1) Compute each base-model output δ_j(x) with shape (batch, d_j)
@@ -410,10 +413,11 @@ class AutoMFNet:
         # base models as funcs
         G = self.learner.to_graph(threshold=threshold)
 
-        # Replace base models with leaf/edge models using the provided functions.
+        # Replace base models with leaf/edge models using the provided
+        # functions.
         for nid in G.nodes:  # Iterate over external node IDs.
-            # Lookup the original base model's output dimension using the
-            # external ID
+            # Lookup the original base model's output dimension using
+            # the external ID
             original_base_model = self.base_models_map[nid]
             node_dim = original_base_model.output_dim()
             parent_ids = list(G.predecessors(nid))
