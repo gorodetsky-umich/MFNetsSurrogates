@@ -11,7 +11,7 @@ import jax.numpy as jnp
 import networkx as nx
 import numpy as np
 import typer
-from pydantic import ValidationError # Added import for ValidationError
+from pydantic import ValidationError  # Added import for ValidationError
 from rich.console import Console
 from rich.table import Table
 
