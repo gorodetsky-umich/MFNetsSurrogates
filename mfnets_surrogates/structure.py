@@ -87,7 +87,9 @@ class MFNetStructureLearner:
         )  # Ensure it's a list for internal use
         self.alpha = alpha
         self.beta = beta
-        self.acyclicity_penalty_type = acyclicity_penalty_type  # Store new parameter
+        self.acyclicity_penalty_type = (
+            acyclicity_penalty_type  # Store new parameter
+        )
 
     def tree_flatten(self) -> tuple[list[jnp.ndarray], tuple]:
         """Flatten parameters (W and base_models) for JAX transformations."""
@@ -238,10 +240,10 @@ class MFNetStructureLearner:
 
         if num_supervised_nodes > 0:
             mse_total /= num_supervised_nodes
-        
+
         # Acyclicity penalty
         W = self.adjacency_matrix * self.constraint_mask
-        H = W * W 
+        H = W * W
 
         if self.acyclicity_penalty_type == "expm":
             expm = jax.scipy.linalg.expm(H)
@@ -249,12 +251,12 @@ class MFNetStructureLearner:
         elif self.acyclicity_penalty_type == "inv":
             penalty_matrix = jnp.linalg.inv(jnp.eye(self.n_nodes) + H)
             h_pen = jnp.trace(penalty_matrix) - self.n_nodes
-        else: # pragma: no cover
+        else:  # pragma: no cover
             # This should ideally be caught in __init__, but as a safeguard
             raise ValueError(
                 f"Unknown acyclicity_penalty_type: {self.acyclicity_penalty_type}"
             )
-        
+
         # Sparsity penalty
         l1 = jnp.sum(jnp.abs(W))
 
@@ -367,7 +369,9 @@ class AutoMFNet:
         self.sink_node = sink_node
         self.alpha = alpha
         self.beta = beta
-        self.acyclicity_penalty_type = acyclicity_penalty_type  # Store new parameter
+        self.acyclicity_penalty_type = (
+            acyclicity_penalty_type  # Store new parameter
+        )
 
         self.node_ids: Sequence[Any] | None = (
             None  # Store the ordered external node IDs
