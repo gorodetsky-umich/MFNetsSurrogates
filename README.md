@@ -163,6 +163,10 @@ If you use this code in your research, please cite the original paper:
 
 This project is licensed under the **MIT License**.
 
+## TODO
+
+- [ ] Investigate and fix hanging `test_structure_learner_acyclicity_penalty` test.
+
 ## Future Work
 
 -   [ ] Add comprehensive unit tests for the Command-Line Interface
