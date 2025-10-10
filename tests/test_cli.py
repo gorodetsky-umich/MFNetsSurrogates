@@ -215,7 +215,9 @@ datasets:
     )
 
 
-@patch("mfnets_surrogates.cli.AutoMFNet")  # Patch where it's looked up and used
+@patch(
+    "mfnets_surrogates.cli.AutoMFNet"
+)  # Patch where it's looked up and used
 def test_cli_run_auto_mode_sink_node_inference(
     mock_auto_mfnet_cls, minimal_auto_config_path: Path
 ):
