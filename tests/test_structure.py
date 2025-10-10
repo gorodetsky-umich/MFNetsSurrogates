@@ -80,17 +80,23 @@ def test_structure_learner_single_node_fit(key):
     weight = jnp.eye(2) * 2.0
     bias = jnp.ones(2) * 3.0
     delta = LinearModel(LinearParams(weight, bias))
-    
-    node_ids = [0] # External node ID
-    base_models = [delta] # Ordered list of models
+
+    node_ids = [0]  # External node ID
+    base_models = [delta]  # Ordered list of models
 
     # Prepare training data: model 0 is supervised
     x = jax.random.normal(key, (8, 2))
     y = delta.run(x)
-    train_data = {0: (x, y)} # Use dictionary for train_data
+    train_data = {0: (x, y)}  # Use dictionary for train_data
 
     # Fit with a few iterations at a high lr (should recover exact δ)
-    learner = MFNetStructureLearner(node_ids=node_ids, base_models=base_models, sink_node=0, alpha=0.0, beta=0.0)
+    learner = MFNetStructureLearner(
+        node_ids=node_ids,
+        base_models=base_models,
+        sink_node=0,
+        alpha=0.0,
+        beta=0.0,
+    )
     learner = learner.fit(train_data, n_iters=50, learning_rate=1.0)
 
     # Check that run(x) matches y exactly
@@ -110,17 +116,25 @@ def test_structure_learner_partial_supervision(key):
     # Two nodes with same output dim: δ0(x)=x, δ1(x)=2x
     m0 = LinearModel(LinearParams(jnp.eye(3), jnp.zeros(3)))
     m1 = LinearModel(LinearParams(jnp.eye(3) * 2, jnp.zeros(3)))
-    
-    node_ids = [0, 1] # External node IDs
-    base_models = [m0, m1] # Ordered list of models
+
+    node_ids = [0, 1]  # External node IDs
+    base_models = [m0, m1]  # Ordered list of models
 
     # Only supervise node 1
     x = jax.random.normal(key, (5, 3))
     y1 = m1.run(x)
-    train_data = {1: (x, y1)} # Use dictionary for train_data, key is external node ID
+    train_data = {
+        1: (x, y1)
+    }  # Use dictionary for train_data, key is external node ID
 
     # Fit; with single edge W[0,1] learnable, it should route node0 -> node1
-    learner = MFNetStructureLearner(node_ids=node_ids, base_models=base_models, sink_node=None, alpha=0.0, beta=0.0)
+    learner = MFNetStructureLearner(
+        node_ids=node_ids,
+        base_models=base_models,
+        sink_node=None,
+        alpha=0.0,
+        beta=0.0,
+    )
     learner = learner.fit(train_data, n_iters=100, learning_rate=0.5)
 
     # After training, if we run on x:
@@ -149,8 +163,8 @@ def test_structure_learner_recovers_known_dag(key):
     model1 = LinearModel(init_linear_params(k1, d_in, d_out))
     model2 = LinearModel(init_linear_params(k2, d_in, d_out))
 
-    node_ids = [0, 1, 2] # External node IDs
-    base_models = [model0, model1, model2] # Ordered list of base models
+    node_ids = [0, 1, 2]  # External node IDs
+    base_models = [model0, model1, model2]  # Ordered list of base models
 
     # Define a 'true' MFNet graph and generate data from it
     def true_run(x):
@@ -164,28 +178,42 @@ def test_structure_learner_recovers_known_dag(key):
 
     # Training data as a dictionary mapping external node IDs to (x,y)
     train_data = {
-        0: (x_train, y_train_0), 1: (x_train, y_train_1), 2: (x_train, y_train_2)
+        0: (x_train, y_train_0),
+        1: (x_train, y_train_1),
+        2: (x_train, y_train_2),
     }
 
-    learner = MFNetStructureLearner(node_ids=node_ids, base_models=base_models, sink_node=2, alpha=1.0, beta=1.0)
+    learner = MFNetStructureLearner(
+        node_ids=node_ids,
+        base_models=base_models,
+        sink_node=2,
+        alpha=1.0,
+        beta=1.0,
+    )
     learner = learner.fit(train_data, n_iters=10000, learning_rate=1e-3)
 
     # Check the learned adjacency matrix.
     # We expect W[0,1] and W[1,2] to be strong, W[0,2] weaker, and others small.
     # Node 2 is sink, so W[2,:] should be near zero after mask.
-    jnp.testing.assert_array_less(learner.adjacency_matrix[2, :], 1e-2)  # 2 is sink
+    jnp.testing.assert_array_less(
+        learner.adjacency_matrix[2, :], 1e-2
+    )  # 2 is sink
 
     # Check recovered DAG
-    dag = learner.to_graph(threshold=0.1) # to_graph no longer needs node_ids/node_funcs
+    dag = learner.to_graph(
+        threshold=0.1
+    )  # to_graph no longer needs node_ids/node_funcs
     assert len(dag.nodes) == n_nodes
     # Assert edges using the external node IDs
-    assert dag.has_edge(0, 1) # 0 -> 1
-    assert dag.has_edge(0, 2) # 0 -> 2
-    assert dag.has_edge(1, 2) # 1 -> 2
+    assert dag.has_edge(0, 1)  # 0 -> 1
+    assert dag.has_edge(0, 2)  # 0 -> 2
+    assert dag.has_edge(1, 2)  # 1 -> 2
     assert not dag.has_edge(1, 0)
     assert not dag.has_edge(2, 0)
     assert not dag.has_edge(2, 1)
-    assert isinstance(dag.nodes[0]["func"], Model) # Check that base models are attached
+    assert isinstance(
+        dag.nodes[0]["func"], Model
+    )  # Check that base models are attached
 
 
 # ----------------------------------------------------------------------
@@ -202,7 +230,9 @@ def test_get_weights_and_mask():
         LinearModel(init_linear_params(k2, d, d)),
     ]
     node_ids = [0, 1, 2]
-    learner = MFNetStructureLearner(node_ids=node_ids, base_models=base_models_list, sink_node=2)
+    learner = MFNetStructureLearner(
+        node_ids=node_ids, base_models=base_models_list, sink_node=2
+    )
     # Manually set adjacency matrix to simulate learning
     learner.adjacency_matrix = jnp.array(
         [[0.0, 0.5, 0.2], [0.0, 0.0, 0.7], [0.0, 0.0, 0.0]]
@@ -210,9 +240,7 @@ def test_get_weights_and_mask():
     # constraint_mask is set by sink_node during __init__
     # expected mask is [[1., 1., 1.], [1., 1., 1.], [0., 0., 0.]]
     W = learner.get_weights()
-    expected_W = jnp.array(
-        [[0.0, 0.5, 0.2], [0.0, 0.0, 0.7], [0.0, 0.0, 0.0]]
-    )
+    expected_W = jnp.array([[0.0, 0.5, 0.2], [0.0, 0.0, 0.7], [0.0, 0.0, 0.0]])
     jnp.testing.assert_allclose(W, expected_W, atol=1e-6)
 
     mask_strict = learner.adjacency_mask(threshold=0.6)
@@ -234,23 +262,31 @@ def test_to_graph_constructs_correct_dag():
     mock_model = Mock(spec=Model)
     mock_model.output_dim.return_value = 1
 
-    node_ids = [10, 20, 30] # External IDs for nodes
-    base_models = [mock_model, mock_model, mock_model] # Ordered list of base models
+    node_ids = [10, 20, 30]  # External IDs for nodes
+    base_models = [
+        mock_model,
+        mock_model,
+        mock_model,
+    ]  # Ordered list of base models
 
     learner = MFNetStructureLearner(
-        node_ids=node_ids, base_models=base_models, sink_node=30 # Sink is external ID
+        node_ids=node_ids,
+        base_models=base_models,
+        sink_node=30,  # Sink is external ID
     )
     # Internal adjacency_matrix is 0-indexed: 0->1, 0->2, 1->2
     learner.adjacency_matrix = jnp.array(
         [[0.0, 0.8, 0.1], [0.0, 0.0, 0.6], [0.0, 0.0, 0.0]]
     )
 
-    dag = learner.to_graph(threshold=0.5) # to_graph no longer takes node_ids/node_funcs
+    dag = learner.to_graph(
+        threshold=0.5
+    )  # to_graph no longer takes node_ids/node_funcs
 
     assert len(dag.nodes) == len(node_ids)
-    assert set(dag.nodes) == set(node_ids) # Check external node IDs
-    assert dag.edges == {(10, 20), (20, 30)} # Edges should use external IDs
-    assert dag.nodes[10]["func"] is mock_model # Check base model is attached
+    assert set(dag.nodes) == set(node_ids)  # Check external node IDs
+    assert dag.edges == {(10, 20), (20, 30)}  # Edges should use external IDs
+    assert dag.nodes[10]["func"] is mock_model  # Check base model is attached
 
 
 # ----------------------------------------------------------------------
@@ -264,29 +300,42 @@ def test_auto_mfnet_single_node_pipeline(key):
 
     model0 = init_linear_model(key, d_in=1, d_out=1)
 
-    node_ids = [0] # External node ID
-    base_models_map = {0: model0} # Map external ID to base model
-    structure_data = {0: (x, y)} # Map external ID to training data
-    param_data = {0: (x, y)} # Map external ID to parameter fitting data
+    node_ids = [0]  # External node ID
+    base_models_map = {0: model0}  # Map external ID to base model
+    structure_data = {0: (x, y)}  # Map external ID to training data
+    param_data = {0: (x, y)}  # Map external ID to parameter fitting data
 
     # AutoMFNet setup
     auto = AutoMFNet(sink_node=0)
     learner = auto.fit_structure(
-        node_ids=node_ids, base_models=base_models_map, structure_data=structure_data, n_iters=100
+        node_ids=node_ids,
+        base_models=base_models_map,
+        structure_data=structure_data,
+        n_iters=100,
     )
 
     # leaf_model_fn and edge_model_fn now accept external node ID (Any)
     def leaf_model_fn(nid: Any, dim: int):
-        return init_linear_model(jax.random.PRNGKey(hash(nid)), d_in=dim, d_out=dim)
+        return init_linear_model(
+            jax.random.PRNGKey(hash(nid)), d_in=dim, d_out=dim
+        )
 
     def edge_model_fn(nid: Any, dim: int, parent_dims: list[int]):
-        return init_linear_model(jax.random.PRNGKey(hash(nid)), d_in=dim + sum(parent_dims), d_out=dim)
+        return init_linear_model(
+            jax.random.PRNGKey(hash(nid)),
+            d_in=dim + sum(parent_dims),
+            d_out=dim,
+        )
 
-    dag = auto.extract_dag(threshold=0.1, leaf_model_fn=leaf_model_fn, edge_model_fn=edge_model_fn)
+    dag = auto.extract_dag(
+        threshold=0.1, leaf_model_fn=leaf_model_fn, edge_model_fn=edge_model_fn
+    )
     assert len(dag.nodes) == 1
     assert 0 in dag.nodes
     assert len(dag.edges) == 0
-    assert isinstance(dag.nodes[0]["func"], LinearModel) # Should now be a leaf model
+    assert isinstance(
+        dag.nodes[0]["func"], LinearModel
+    )  # Should now be a leaf model
 
     mfnet = auto.fit_parameters(
         dag, param_data, n_iters=100, learning_rate=1.0, verbose=False
@@ -301,33 +350,52 @@ def test_auto_mfnet_two_node_no_edge(key):
     # Data for two nodes, no interdependence
     x1, y1 = jnp.array([[1.0], [2.0]]), jnp.array([[2.0], [4.0]])
     x2, y2 = jnp.array([[3.0], [4.0]]), jnp.array([[6.0], [8.0]])
-    
+
     model1 = init_linear_model(k1, d_in=1, d_out=1)
     model2 = init_linear_model(k2, d_in=1, d_out=1)
-    
-    node_ids = [1, 2] # External node IDs
-    base_models_map = {1: model1, 2: model2} # Map external ID to base model
-    structure_data = {1: (x1, y1), 2: (x2, y2)} # Map external ID to training data
-    param_data = {1: (x1, y1), 2: (x2, y2)} # Map external ID to parameter fitting data
+
+    node_ids = [1, 2]  # External node IDs
+    base_models_map = {1: model1, 2: model2}  # Map external ID to base model
+    structure_data = {
+        1: (x1, y1),
+        2: (x2, y2),
+    }  # Map external ID to training data
+    param_data = {
+        1: (x1, y1),
+        2: (x2, y2),
+    }  # Map external ID to parameter fitting data
 
     # AutoMFNet setup: force sparsity to get no edges. sink_node=2 (external ID)
-    auto = AutoMFNet(sink_node=2, alpha=0.0, beta=1.0) # beta=1.0 promotes sparsity
+    auto = AutoMFNet(
+        sink_node=2, alpha=0.0, beta=1.0
+    )  # beta=1.0 promotes sparsity
     learner = auto.fit_structure(
-        node_ids=node_ids, base_models=base_models_map, structure_data=structure_data, n_iters=1000
+        node_ids=node_ids,
+        base_models=base_models_map,
+        structure_data=structure_data,
+        n_iters=1000,
     )
 
     # leaf_model_fn and edge_model_fn now accept external node ID (Any)
     def leaf_model_fn(nid: Any, dim: int):
-        return init_linear_model(jax.random.PRNGKey(hash(nid)), d_in=dim, d_out=dim)
+        return init_linear_model(
+            jax.random.PRNGKey(hash(nid)), d_in=dim, d_out=dim
+        )
 
     def edge_model_fn(nid: Any, dim: int, parent_dims: list[int]):
-        return init_linear_model(jax.random.PRNGKey(hash(nid)), d_in=dim + sum(parent_dims), d_out=dim)
+        return init_linear_model(
+            jax.random.PRNGKey(hash(nid)),
+            d_in=dim + sum(parent_dims),
+            d_out=dim,
+        )
 
-    dag = auto.extract_dag(threshold=0.1, leaf_model_fn=leaf_model_fn, edge_model_fn=edge_model_fn)
+    dag = auto.extract_dag(
+        threshold=0.1, leaf_model_fn=leaf_model_fn, edge_model_fn=edge_model_fn
+    )
 
     assert len(dag.nodes) == 2
     assert set(dag.nodes) == {1, 2}
-    assert len(dag.edges) == 0 # No edges due to sparsity penalty
+    assert len(dag.edges) == 0  # No edges due to sparsity penalty
 
     mfnet = auto.fit_parameters(
         dag, param_data, n_iters=2000, learning_rate=1.0, verbose=False
