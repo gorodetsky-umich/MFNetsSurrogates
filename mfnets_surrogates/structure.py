@@ -301,7 +301,8 @@ class AutoMFNet:
             raise RuntimeError("You must call fit_structure(...) first.")
 
         # The external node IDs are typically 1-indexed in the CLI and config.
-        # This change maps the internal 0-indexed learner nodes to 1-indexed external IDs
+        # This change maps the internal 0-indexed learner nodes to 1-indexed
+        # external IDs
         # when constructing the NetworkX graph.
         node_ids_for_graph = list(range(1, self.learner.n_nodes + 1))
 
@@ -310,7 +311,8 @@ class AutoMFNet:
             raise RuntimeError("fit_structure() must be called first.")
         base_models: list[Model] = self.base_models
 
-        # Create a mapping from the new 1-indexed node IDs to the original 0-indexed base models
+        # Create a mapping from the new 1-indexed node IDs to the original
+        # 0-indexed base models
         node_funcs_map = {
             new_id: base_models[idx]
             for idx, new_id in enumerate(node_ids_for_graph)
@@ -323,7 +325,8 @@ class AutoMFNet:
             threshold=threshold,
         )
         for nid in G.nodes:
-            # Adjust index for base_models lookup (node_ids_for_graph are 1-based, base_models is 0-based)
+            # Adjust index for base_models lookup (node_ids_for_graph are
+            # 1-based, base_models is 0-based)
             original_idx = nid - 1
             node_dim = base_models[original_idx].output_dim()
             parent_ids = list(G.predecessors(nid))
