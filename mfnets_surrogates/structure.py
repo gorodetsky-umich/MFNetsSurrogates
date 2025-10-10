@@ -41,8 +41,9 @@ class MFNetStructureLearner:
             base_models: A list of Model instances for δ_j outputs. Must be
                          ordered corresponding to `node_ids`.
             sink_node: Identifier of a node to force as sink (no outgoing
-                       edges). Must be one of the `node_ids`. If None, no node
-                       is explicitly masked as a sink; `AutoMFNet` may infer one.
+                       edges). Must be one of the `node_ids`. If None, no
+                       node is explicitly masked as a sink; `AutoMFNet` may
+                       infer one.
             alpha: Weight for acyclicity penalty.
             beta: Weight for L1 sparsity penalty.
         """
