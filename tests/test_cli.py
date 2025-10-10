@@ -137,7 +137,6 @@ def test_cli_load_training_data_node_not_in_graph_warning(
 ):
     """Test _load_training_data warns if node data is present but not in
     config.graph['nodes'].
-
     """
     config_content = f"""
 mode: fixed
@@ -173,7 +172,6 @@ def test_cli_run_auto_mode_sink_node_inference(
 ):
     """Test auto mode correctly infers sink_node when not specified in
     config.
-
     """
     # Modify config to remove sink_node explicitly
     config_content = minimal_auto_config_path.read_text()

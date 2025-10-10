@@ -412,12 +412,12 @@ class AutoMFNet:
         Args:
             threshold: Threshold to prune edges from the learned adjacency
                 matrix.
-            leaf_model_fn: A factory function
-                `leaf_model_fn(node_id, node_dim) -> Model` to instantiate
-                models for nodes that become leaves in the DAG.
-            edge_model_fn: A factory function
-                `edge_model_fn(node_id, node_dim, parent_dims) -> Model` to
-                instantiate models for nodes that have parents in the DAG.
+            leaf_model_fn: A factory function `leaf_model_fn(node_id,
+                node_dim) -> Model` to instantiate models for nodes that
+                become leaves in the DAG.
+            edge_model_fn: A factory function `edge_model_fn(node_id,
+                node_dim, parent_dims) -> Model` to instantiate models for
+                nodes that have parents in the DAG.
 
         Returns
         -------

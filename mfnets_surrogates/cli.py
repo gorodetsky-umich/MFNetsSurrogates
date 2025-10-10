@@ -71,7 +71,8 @@ def _instantiate_model(
             parameters.
         d_in: The primary input dimension of the node model.
         d_out: The output dimension of the node model.
-        d_parent: The combined output dimension of all parent nodes, if any.
+        d_parent: The combined output dimension of all parent nodes, if
+            any.
         key: A JAX PRNGKey for model initialization.
 
     Returns
