@@ -435,7 +435,7 @@ def run(
 
         # param_data for fit_parameters is now the structure_data dictionary directly
         mfnet = auto.fit_parameters(
-            dag,
+            dag=dag,
             param_data=structure_data, # Pass the dictionary directly
             n_iters=config.training.num_steps,
             learning_rate=config.training.learning_rate,
