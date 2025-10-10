@@ -366,7 +366,7 @@ def run(
     """Build, train, and run predictions for an MFNets surrogate model."""
     config = _load_and_validate_config(config_path)
     key = jax.random.PRNGKey(42)
-    training_data, dim_info, structure_data = _load_training_data(config)
+    training_data, dim_info, structure_data, config_node_ids = _load_training_data(config)
 
     if config.mode.lower() == "auto":
         if not (
@@ -377,28 +377,23 @@ def run(
             )
             raise typer.Exit(code=1)
 
-        base_models = []
-        dims_seq = []
-        # The node IDs from config.graph["nodes"] are used to determine
-        # the order
-        # and number of base models. These are assumed to be 0-indexed
-        # internally
-        # for the structure learner.
-        sorted_node_ids = sorted(config.graph["nodes"])
-
-        for node_id in sorted_node_ids:
-            spec = config.base_models.get(node_id)
+        base_models_for_learner: dict[Any, Model] = {} # Store models by their external ID
+        
+        # We now iterate over config_node_ids (which is already ordered from config.graph["nodes"])
+        for node_id_ext in config_node_ids:
+            spec = config.base_models.get(node_id_ext)
             if not spec:
                 console.print(
-                    f"[bold red]Missing model spec for node {node_id}.[/]"
+                    f"[bold red]Missing model spec for node {node_id_ext}.[/]"
                 )
                 raise typer.Exit(code=1)
-            d_in, d_out = dim_info[node_id]
+            if node_id_ext not in dim_info:
+                console.print(f"[bold red]Dimensions for node {node_id_ext} not found in training data.[/]")
+                raise typer.Exit(code=1)
+            d_in, d_out = dim_info[node_id_ext]
             key, sub = jax.random.split(key)
-            # Instantiate base models with d_parent=0 as they are not yet
-            # part of the DAG
-            base_models.append(_instantiate_model(spec, d_in, d_out, 0, sub))
-            dims_seq.append((d_in, d_out))
+            model_instance = _instantiate_model(spec, d_in, d_out, 0, sub)
+            base_models_for_learner[node_id_ext] = model_instance
 
         # The sink node in AutoMFNet is determined by the structure learner,
         # which uses the `sink_node` parameter if provided, or infers it.
@@ -410,7 +405,8 @@ def run(
             sink_node=config.sink_node, alpha=config.alpha, beta=config.beta
         )
         auto.fit_structure(
-            base_models,
+            node_ids=config_node_ids, # Pass the ordered list of node IDs
+            base_models=base_models_for_learner, # Pass the dict of models
             structure_data,  # This is now correctly indexed
             n_iters=config.training.num_steps,
             learning_rate=config.training.learning_rate,
@@ -418,72 +414,32 @@ def run(
 
         leaf_tpl = config.leaf_model
 
-        def leaf_fn(nid: int, dim: int):
-            # nid here is the 1-based external ID from the DAG.
-            # We need to map it back to the 0-based index for dims_seq.
-            original_idx = nid - 1
-            if not (0 <= original_idx < len(dims_seq)):
-                console.print(
-                    f"[bold red]Invalid node ID {nid} for leaf_fn.[/]"
-                )
+        def leaf_fn(nid: Any, dim: int): # nid is now Any, the external ID
+            if nid not in dim_info:
+                console.print(f"[bold red]Dimensions for node {nid} not found for leaf_fn.[/]")
                 raise typer.Exit(code=1)
-            d_in, _ = dims_seq[original_idx]
-            key_l = jax.random.PRNGKey(1000 + nid)
+            d_in, _ = dim_info[nid] # Lookup dimensions directly using external nid
+            key_l = jax.random.PRNGKey(1000 + hash(nid) % (2**31 - 1)) # Use hash for non-int nid
             return _instantiate_model(leaf_tpl, d_in, dim, 0, key_l)
 
         edge_tpl = config.edge_model
 
-        def edge_fn(nid: int, dim: int, parent_dims: list[int]):
-            # nid here is the 1-based external ID from the DAG.
-            # We need to map it back to the 0-based index for dims_seq.
-            original_idx = nid - 1
-            if not (0 <= original_idx < len(dims_seq)):
-                console.print(
-                    f"[bold red]Invalid node ID {nid} for edge_fn.[/]"
-                )
+        def edge_fn(nid: Any, dim: int, parent_dims: list[int]): # nid is now Any
+            if nid not in dim_info:
+                console.print(f"[bold red]Dimensions for node {nid} not found for edge_fn.[/]")
                 raise typer.Exit(code=1)
-            d_in, _ = dims_seq[original_idx]
-            key_e = jax.random.PRNGKey(2000 + nid)
+            d_in, _ = dim_info[nid] # Lookup dimensions directly using external nid
+            key_e = jax.random.PRNGKey(2000 + hash(nid) % (2**31 - 1)) # Use hash for non-int nid
             return _instantiate_model(
                 edge_tpl, d_in, dim, sum(parent_dims), key_e
             )
 
         dag = auto.extract_dag(config.threshold, leaf_fn, edge_fn)
 
-        # param_data should be the actual training data, not structure_data
-        # We need to reload the training data specifically for parameter
-        # fitting.
-        # Assuming the first training dataset in the config is the one to use.
-        training_dataset_for_fit = next(
-            (d for d in config.datasets if d.type == "training"), None
-        )
-        if not training_dataset_for_fit:
-            console.print(
-                "[bold red]No training dataset found for parameter fitting.[/]"
-            )
-            raise typer.Exit(code=1)
-
-        data_for_fit = jnp.load(training_dataset_for_fit.data_path)
-        param_data = []
-        # Ensure the order of param_data matches the order of nodes in the DAG
-        # The DAG nodes are typically 1-indexed external IDs.
-        sorted_dag_node_ids = sorted(dag.nodes)
-        for node_id_ext in sorted_dag_node_ids:
-            # Map external ID back to the key used in the data file
-            node_id_str = str(node_id_ext)
-            x_key = f"x_train_{node_id_str}"
-            y_key = f"y_train_{node_id_str}"
-            if x_key not in data_for_fit or y_key not in data_for_fit:
-                console.print(
-                    f"[bold red]Data key not found for node {node_id_ext} "
-                    f"in {training_dataset_for_fit.data_path}[/]"
-                )
-                raise typer.Exit(code=1)
-            param_data.append((data_for_fit[x_key], data_for_fit[y_key]))
-
+        # param_data for fit_parameters is now the structure_data dictionary directly
         mfnet = auto.fit_parameters(
             dag,
-            param_data,
+            param_data=structure_data, # Pass the dictionary directly
             n_iters=config.training.num_steps,
             learning_rate=config.training.learning_rate,
         )

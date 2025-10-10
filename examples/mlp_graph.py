@@ -278,41 +278,52 @@ def main():
     # ------------------------------------------------------------------
     # 3. Two-stage AutoMFNet demonstration
     print("\n--- 3. Training AutoMFNet Discovered Structure ---")
-    # Stage-1 base models: use the same 3-layer MLPs as hard-coded graphs
-    leaf_models = [
-        init_mlp_model(
-            jax.random.split(key, 5)[i],
-            [d_in, 16, 16, d_out],
-            jax.nn.tanh,
-        )
-        for i in range(4)
-    ]
-    # Only supervise the highest-fidelity node (index 3)
-    struct_data = [None, None, None, (x_train, y_train[3])]
+    
+    # Node IDs are 0, 1, 2, 3 as used in the manual graphs
+    auto_node_ids = (0, 1, 2, 3)
+
+    # Stage-1 base models: as a dictionary mapping node_id to model
+    base_models_for_auto = {
+        i: init_mlp_model(jax.random.split(key, 5)[i], [d_in, 16, 16, d_out], jax.nn.tanh)
+        for i in auto_node_ids
+    }
+
+    # Structure data as a dictionary: only highest-fidelity node 3 is supervised
+    struct_data_auto = {3: (x_train, y_train[3])}
+
     auto = AutoMFNet(sink_node=3, alpha=0.1, beta=0.01)
     auto.fit_structure(
-        leaf_models, struct_data, n_iters=2000, learning_rate=0.1
+        node_ids=auto_node_ids,
+        base_models=base_models_for_auto,
+        structure_data=struct_data_auto,
+        n_iters=2000,
+        learning_rate=0.1,
     )
     # Diagnostic: print learned adjacency matrix
     W_learned = auto.learner.get_weights()
     print(" Learned W matrix (after structure fit):")
     print(W_learned)
     # Extract with MLP leaf & enhancement factories
+    # leaf_model_fn and edge_model_fn now receive the external node ID (nid)
     dag_auto = auto.extract_dag(
         threshold=0.1,
-        leaf_model_fn=lambda nid, dim: leaf_models[nid],
+        leaf_model_fn=lambda nid, dim: base_models_for_auto[nid], # Reuse the base model
         edge_model_fn=lambda nid, dim, pdims: init_mlp_enhancement_model(
-            jax.random.split(key, 1)[0],
+            # Use hash(nid) for PRNGKey to support arbitrary node IDs if needed
+            jax.random.PRNGKey(hash(nid) % (2**31 - 1)),
             [d_in + sum(pdims), 32, 32, dim],
             jax.nn.tanh,
         ),
     )
     # Diagnostic: print discovered DAG edges
     print(" Discovered DAG edges:", list(dag_auto.edges))
+    
     # Plot discovered graph
     plot_graph_on_ax(ax_map["Auto"][0], dag_auto, "AutoMFNet Discovered Graph")
+    
     # Stage-2: train all fidelities on this fixed DAG
-    param_data = [(x_train, y) for y in y_train]
+    # Convert y_train tuple to a dict mapping node ID to (x_train, y)
+    param_data_auto = {nid: (x_train, y_train[nid]) for nid in auto_node_ids}
     # Diagnostic: compute pre-training MSE
     mfnet_pre = MFNetJax(dag_auto)
     y_pre = mfnet_pre.run((3,), x_train)[0]
@@ -320,7 +331,7 @@ def main():
     print(f"  AutoMFNet Pre-training MSE: {mse_train_pre:1.6E}")
     mfnet_auto = auto.fit_parameters(
         dag_auto,
-        param_data,
+        param_data_auto, # Pass the dictionary
         n_iters=5000,
         learning_rate=1e-3,
         verbose=False,
