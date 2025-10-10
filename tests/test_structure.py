@@ -1,9 +1,10 @@
+from unittest.mock import Mock
+
 import jax
 import jax.numpy as jnp
 import numpy.testing as npt
 import pytest
 from jax import tree_util
-from unittest.mock import Mock
 
 from mfnets_surrogates import (
     AutoMFNet,
