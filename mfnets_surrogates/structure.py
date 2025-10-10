@@ -23,18 +23,16 @@ class MFNetStructureLearner:
 
     def __init__(
         self,
-        node_ids: Sequence[
-            Any
-        ],  # New: Explicit sequence of node identifiers (external IDs)
-        base_models: Sequence[
-            Model
-        ],  # Sequence must correspond to `node_ids` by index
-        sink_node: Any | None = None,  # Now accepts external node ID
+        node_ids: Sequence[Any],
+        # New: Explicit sequence of node identifiers (external IDs)
+        base_models: Sequence[Model],
+        # Sequence must correspond to `node_ids` by index
+        sink_node: Any | None = None,
+        # Now accepts external node ID
         alpha: float = 1.0,
         beta: float = 1.0,
     ) -> None:
-        """
-        Initialize the structure learning engine.
+        """Initialize the structure learning engine.
 
         Args:
             node_ids: A sequence of identifiers for the nodes in the graph.
@@ -44,7 +42,7 @@ class MFNetStructureLearner:
                          ordered corresponding to `node_ids`.
             sink_node: Identifier of a node to force as sink (no outgoing
                        edges). Must be one of the `node_ids`. If None, no node
-                       is explicitly masked as a sink.
+                       is explicitly masked as a sink; `AutoMFNet` may infer one.
             alpha: Weight for acyclicity penalty.
             beta: Weight for L1 sparsity penalty.
         """
