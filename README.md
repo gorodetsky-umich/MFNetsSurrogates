@@ -19,10 +19,29 @@ The library is built on JAX to enable execution on hardware accelerators like GP
 * **Composable Models**: Includes a suite of built-in models that can be used as nodes in the graph, including LinearModel, MLPModel, and PCEModel (Polynomial Chaos Expansion).  
 * **Modern Tooling**: Uses Optax for optimization, Ruff for linting and formatting, and Pytest for testing.
 * **Selective Parameter Freezing**: Expose an `optimizable` flag on each model node so you can freeze or unfreeze parameters during training for fine-grained control.  
-* **Automatic Structure Discovery**: Use `AutoMFNet` to learn a sparse DAG
-  from partial data and then train high-fidelity models in a two-stage
-  pipeline.
+* **Automatic Structure Discovery**: Use `AutoMFNet` for a two-stage process
+  of structure learning to find an optimal graph from data, and then training
+  the resulting MFNet.
 
+## **How it Works**
+
+This library is built on the idea that relationships between different data fidelities can be modeled as a directed acyclic graph (DAG). Each node in the graph represents a specific fidelity, and the directed edges define how information flows from lower-fidelity sources to higher-fidelity ones.
+
+There are two primary ways to use this library:
+
+### 1. Fixed Graph Structure (`MFNetJax`)
+
+If you already know the relationship between your data fidelities, you can define the graph structure manually using `networkx`. Each node is assigned a model (e.g., a linear model, MLP, or PCE). The entire graph is encapsulated in an `MFNetJax` object, which is a JAX PyTree. This allows the entire multi-fidelity system to be trained end-to-end with gradient-based optimizers like Optax.
+
+### 2. Automatic Structure Discovery (`AutoMFNet`)
+
+If the optimal graph structure is unknown, `AutoMFNet` provides a two-stage pipeline to discover it from data:
+
+1.  **Stage 1: Structure Learning**: A fully-connected graph is assumed, where each node has a simple "base" model. The system learns an adjacency matrix `W` that represents the strength of connections between fidelities. A loss function combining data-fit error with penalties for complexity (L1 sparsity) and cycles (NOTEARS) is minimized to find a sparse, acyclic graph.
+
+2.  **Stage 2: Parameter Learning**: The learned adjacency matrix `W` is pruned at a threshold to produce a discrete DAG. The simple base models are replaced with more expressive user-defined models (e.g., larger MLPs). This final graph is then trained end-to-end on all available data using the `MFNetJax.fit` method.
+
+This two-stage approach allows for data-driven discovery of efficient multi-fidelity architectures without requiring expert knowledge of the underlying information fusion structure.
 ## **Installation**
 
 Install the package using pip. For a standard installation, run:  
