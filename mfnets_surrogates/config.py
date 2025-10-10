@@ -61,6 +61,10 @@ class Config(BaseModel):
         description="Edge-pruning threshold |W_ij| ≤ τ during DAG extraction "
         "(auto mode only).",
     )
+    sink_node: Any | None = Field(
+        default=None,
+        description="Node ID to force as sink (no outgoing edges) in auto mode.",
+    )
 
     # Optional model templates used exclusively in auto mode
     base_models: dict[int | str, ModelParams] | None = Field(

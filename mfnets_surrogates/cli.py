@@ -60,8 +60,8 @@ def _instantiate_model(
     d_in: int,
     d_out: int,
     d_parent: int,
-    key: jax.random.PRNGKey,
-) -> Any:
+    key: jax.Array, # Changed from jax.random.PRNGKey to jax.Array
+) -> Model: # Added explicit return type
     """Instantiate a model based on the specification."""
     # Case-insensitive lookup so "PCEModel" == "pcemodel"
     initializer = next(
@@ -433,7 +433,7 @@ def run(
 
         leaf_tpl = config.leaf_model
 
-        def leaf_fn(nid: Any, dim: int):  # nid is now Any, the external ID
+        def leaf_fn(nid: Any, dim: int) -> Model:  # Added return type
             if nid not in dim_info:
                 console.print(
                     f"[bold red]Dimensions for node {nid} not found for "
@@ -446,13 +446,14 @@ def run(
             key_l = jax.random.PRNGKey(
                 1000 + hash(nid) % (2**31 - 1)
             )  # Use hash for non-int nid.
+            # leaf_tpl can be None, handled by _instantiate_model.
             return _instantiate_model(leaf_tpl, d_in, dim, 0, key_l)
 
         edge_tpl = config.edge_model
 
         def edge_fn(
-            nid: Any, dim: int, parent_dims: list[int]
-        ):  # nid is now Any
+            nid: Any, dim: int, parent_dims: Sequence[int] # Changed list[int] to Sequence[int]
+        ) -> Model:  # Added return type
             if nid not in dim_info:
                 console.print(
                     f"[bold red]Dimensions for node {nid} not found for "
@@ -465,6 +466,7 @@ def run(
             key_e = jax.random.PRNGKey(
                 2000 + hash(nid) % (2**31 - 1)
             )  # Use hash for non-int nid.
+            # edge_tpl can be None, handled by _instantiate_model.
             return _instantiate_model(
                 edge_tpl, d_in, dim, sum(parent_dims), key_e
             )
