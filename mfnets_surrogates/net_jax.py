@@ -862,7 +862,8 @@ class PCEScaleShiftModel(Model):
 
         Returns
         -------
-            The enhanced output, computed as `scale(x) @ parent_val + shift(x)`.
+            The enhanced output, computed as
+            `scale(x) @ parent_val + shift(x)`.
         """
         edge_val = self.edge_model.run(xin)
         node_val = self.node_model.run(xin)
