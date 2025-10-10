@@ -11,7 +11,8 @@ import jax.numpy as jnp
 import networkx as nx
 import numpy as np
 import typer
-from pydantic import ValidationError  # Added import for ValidationError
+import yaml
+from pydantic import ValidationError
 from rich.console import Console
 from rich.table import Table
 
@@ -48,8 +49,10 @@ ACTIVATION_FUNCTIONS: dict[str, Callable[[jnp.ndarray], jnp.ndarray]] = {
 def _load_and_validate_config(config_path: Path) -> Config:
     """Load and validate the YAML config file using Pydantic."""
     console.print(f"Loading configuration from: [bold cyan]{config_path}[/]")
-    try:  # Using Pydantic V2 method for file validation
-        return Config.model_validate_file(config_path)
+    try:
+        with open(config_path) as f:
+            raw_config = yaml.safe_load(f)
+        return Config.model_validate(raw_config)
     except FileNotFoundError as e:
         console.print(
             f"[bold red]Error parsing configuration file: "
@@ -60,7 +63,6 @@ def _load_and_validate_config(config_path: Path) -> Config:
         console.print(f"[bold red]Configuration validation error:[/]\n{e}")
         raise typer.Exit(code=1) from e
     except Exception as e:
-        # Catch other potential errors during YAML loading or Pydantic init
         console.print(f"[bold red]Error parsing configuration file:[/]\n{e}")
         raise typer.Exit(code=1) from e
 
@@ -410,7 +412,7 @@ def run(
             "--config",
             "-c",
             help="Path to the YAML configuration file.",
-            exists=True,
+            # exists=True, # Removed to allow custom FileNotFoundError handling
             file_okay=True,
             dir_okay=False,
             readable=True,
